@@ -1,0 +1,2 @@
+GET  /health
+POST /preguntar
