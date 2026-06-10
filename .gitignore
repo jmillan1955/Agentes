@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual envs
+.venv/
+venv/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Configuración local
+config.local.py
+
+# Entornos
+.env
+
+# Windows
+Thumbs.db
+Desktop.ini
