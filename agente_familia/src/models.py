@@ -34,3 +34,4 @@ SENSORES_ACCESO_CASA = {
     "Puerta principal": "binary_sensor.puerta_principal_contact",
     "Puerta garaje": "binary_sensor.puerta_garaje_contact",
 }
+

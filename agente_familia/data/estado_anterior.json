@@ -1,15 +1,15 @@
 {
   "José": {
     "estado": "home",
-    "latitud": 40.5523544,
-    "longitud": -3.9019502,
-    "ultima_actualizacion": "2026-06-10T09:28:09.198084+00:00"
+    "latitud": 40.5523381,
+    "longitud": -3.9019888,
+    "ultima_actualizacion": "2026-06-11T06:34:36.333868+00:00"
   },
   "Mari": {
-    "estado": "home",
-    "latitud": 40.552313999282596,
-    "longitud": -3.901984380068398,
-    "ultima_actualizacion": "2026-06-09T18:50:48.289967+00:00"
+    "estado": "Trabajo Mari",
+    "latitud": 40.430423010959466,
+    "longitud": -3.7002289552584404,
+    "ultima_actualizacion": "2026-06-11T05:17:03.077029+00:00"
   },
   "Jessica": {
     "estado": "Casa Jessi",

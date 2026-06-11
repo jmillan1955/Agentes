@@ -57,7 +57,6 @@ def detectar_anomalias_familia() -> list[str]:
 
     return anomalias
 
-
 def generar_informe_anomalias() -> str:
     anomalias = detectar_anomalias_familia()
 
@@ -72,6 +71,8 @@ def generar_informe_anomalias() -> str:
         lineas.append(f"- {anomalia}")
 
     return "\n".join(lineas)
+
+
 def leer_persona(ha: HomeAssistantClient, nombre: str, entity_id: str) -> dict:
     estado = ha.get_state(entity_id)
     atributos = estado.get("attributes", {})
@@ -102,7 +103,6 @@ def leer_familia() -> list[dict]:
 
     return familia
 
-
 def esta_hogar_vacio(nombre_hogar: str) -> dict:
     familia = leer_familia()
     hogar = HOGARES[nombre_hogar]
@@ -121,8 +121,6 @@ def esta_hogar_vacio(nombre_hogar: str) -> dict:
         "vacio": len(presentes) == 0,
         "presentes": presentes,
     }
-
-
 
 def generar_informe_familia() -> str:
     familia = leer_familia()
@@ -253,3 +251,33 @@ def intentar_actualizar_ubicaciones() -> str:
             lineas.append(f"{nombre}: no se pudo solicitar actualización de {tracker}.")
 
     return "\n".join(lineas)
+
+
+def generar_informe_persona(nombre_buscado: str) -> str:
+    familia = leer_familia()
+
+    for persona in familia:
+        if persona["nombre"] == nombre_buscado:
+            lineas = []
+
+            lineas.append(f"Información de {persona['nombre']}")
+            lineas.append("--------------------")
+            lineas.append(f"Estado: {persona['estado']}")
+
+            if persona.get("direccion"):
+                lineas.append(f"Dirección: {persona['direccion']}")
+
+            if persona.get("ultima_actualizacion"):
+                lineas.append(
+                    f"Última actualización: {persona['ultima_actualizacion']}"
+                )
+
+            if persona.get("tracker"):
+                lineas.append(f"Tracker: {persona['tracker']}")
+
+            if persona.get("precision_gps") is not None:
+                lineas.append(f"Precisión GPS: {persona['precision_gps']} m")
+
+            return "\n".join(lineas)
+
+    return f"No encuentro información de {nombre_buscado}."

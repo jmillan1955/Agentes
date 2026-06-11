@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from agente_familia.src.agent import responder
+from agente_familia.src.ai_agent import responder_con_ia
+from agente_familia.src.local_ai import responder_local
 
 
 load_dotenv()
@@ -51,4 +53,27 @@ def preguntar(
 
     return {
         "respuesta": responder(datos.pregunta)
+    }
+
+@app.post("/preguntar_ia")
+def preguntar_ia(
+    datos: PreguntaRequest,
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "respuesta": responder_con_ia(datos.pregunta)
+    }
+
+
+@app.post("/preguntar_local")
+def preguntar_local(
+    datos: PreguntaRequest,
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "respuesta": responder_local(datos.pregunta)
     }
