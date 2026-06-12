@@ -56,7 +56,7 @@ def solicitar_actualizacion_ubicacion(persona: str) -> bool:
             "message": "command_update_sensors"
         },
     )
-
+    print("[UBICACION] command_update_sensors")
     time.sleep(5)
 
     ha.call_service(
@@ -66,11 +66,11 @@ def solicitar_actualizacion_ubicacion(persona: str) -> bool:
             "message": "request_location_update"
         },
     )
-
+    print("[UBICACION] request_location_update")
     print(f"[UBICACION] Solicitud enviada a {persona}")
 
     time.sleep(60)
-
+    print("[UBICACION] esperando 30 segundos")
     estado_final = ha.get_state(config["sensor"])
     last_updated_final = estado_final.get("last_updated")
 
