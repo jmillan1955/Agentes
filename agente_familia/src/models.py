@@ -44,3 +44,10 @@ SEGUIMIENTO_PERSONAS = {
     "jessi": "Jessica",
     "javi": "Javi",
 }
+
+PERSON_ENTITY_IDS = {
+    "José": "person.jose",
+    "Mari": "person.mari",
+    "Jessica": "person.jessica",
+    "Javi": "person.javi",
+}

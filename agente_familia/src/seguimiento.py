@@ -77,23 +77,27 @@ def obtener_posicion(nombre: str) -> dict | None:
     if not entity_id:
         return None
 
-    datos = ha.get_state(entity_id)
-    atributos = datos.get("attributes", {})
-
+    datos_geo = ha.get_state(entity_id)
+    atributos = datos_geo.get("attributes", {})
     location = extraer_location(atributos)
 
-    if not location:
-        return None
+    person_entity = PERSON_ENTITY_IDS.get(nombre)
+    datos_persona = ha.get_state(person_entity) if person_entity else {}
 
     return {
         "entity_id": entity_id,
-        "estado": datos.get("state"),
+        "estado": datos_persona.get("state") or datos_geo.get("state"),
         "latitud": location[0],
         "longitud": location[1],
-        "direccion": construir_direccion(atributos, datos.get("state")),
-        "last_updated": datos.get("last_updated"),
-        "last_changed": datos.get("last_changed"),
+        "direccion": construir_direccion(atributos, datos_geo.get("state")),
+        "last_changed": datos_persona.get("last_changed"),
+        "last_updated": datos_persona.get("last_updated"),
     }
+
+
+
+
+
 
 
 def leer_zonas() -> list[dict]:
