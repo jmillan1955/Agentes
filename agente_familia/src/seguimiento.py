@@ -44,12 +44,13 @@ def construir_direccion(atributos: dict, estado: str | None = None) -> str:
     locality = atributos.get("Locality") or atributos.get("locality")
     postal_code = atributos.get("Postal Code") or atributos.get("postal_code")
 
-    if name:
-        calle = str(name)
-    elif thoroughfare and numero:
+    
+    if thoroughfare and numero:
         calle = f"{thoroughfare}, {numero}"
     elif thoroughfare:
         calle = str(thoroughfare)
+    elif name:
+        calle = str(name)
     else:
         calle = estado or "Dirección no disponible"
 
@@ -90,8 +91,8 @@ def obtener_posicion(nombre: str) -> dict | None:
         "latitud": location[0],
         "longitud": location[1],
         "direccion": construir_direccion(atributos, datos.get("state")),
-        "ultima_actualizacion": datos.get("last_updated"),
-        "ultimo_cambio": datos.get("last_changed"),
+        "last_updated": datos.get("last_updated"),
+        "last_changed": datos.get("last_changed"),
     }
 
 
@@ -212,13 +213,15 @@ def crear_mensaje_seguimiento(nombre: str, posicion: dict) -> str:
         )
 
     return (
-        f"📍 Seguimiento de {nombre}\n\n"
+        f"Seguimiento de {nombre}\n\n"
         f"Dirección:\n"
         f"{posicion['direccion']}\n\n"
         f"{texto_zona}\n\n"
-        f"Última actualización:\n"
-        f"{formatear_fecha(posicion['ultima_actualizacion'])}"
-    )
+        f"Last updated:\n"
+        f"{formatear_fecha(posicion['last_updated'])}\n\n"
+        f"Last changed:\n"
+        f"{formatear_fecha(posicion['last_changed'])}"
+)
 
 
 def ejecutar_seguimientos() -> str:
@@ -309,8 +312,5 @@ def actualizar_entidades_persona(nombre: str) -> list[str]:
     return actualizadas
 
 
-
-
 if __name__ == "__main__":
-    print(ejecutar_seguimientos())
     print(ejecutar_seguimientos())
