@@ -35,3 +35,12 @@ SENSORES_ACCESO_CASA = {
     "Puerta garaje": "binary_sensor.puerta_garaje_contact",
 }
 
+
+SEGUIMIENTO_PERSONAS = {
+    "mari": "Mari",
+    "pepe": "José",
+    "jose": "José",
+    "jessica": "Jessica",
+    "jessi": "Jessica",
+    "javi": "Javi",
+}

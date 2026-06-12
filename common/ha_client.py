@@ -22,6 +22,18 @@ class HomeAssistantClient:
             "Content-Type": "application/json",
         }
 
+    def get_states(self) -> list[dict]:
+        url = f"{self.base_url}/api/states"
+
+        response = requests.get(
+            url,
+            headers=self.headers,
+            timeout=10,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
     def get_state(self, entity_id: str) -> dict:
         url = f"{self.base_url}/api/states/{entity_id}"
 
@@ -42,3 +54,22 @@ class HomeAssistantClient:
 
         response.raise_for_status()
         return response.json()
+    
+    def leer_zonas():
+        ha = HomeAssistantClient()
+
+        estados = ha.get_states()
+
+        zonas = []
+
+        for entidad in estados:
+            if entidad["entity_id"].startswith("zone."):
+                zonas.append({
+                    "entity_id": entidad["entity_id"],
+                    "nombre": entidad["attributes"].get("friendly_name"),
+                    "latitud": entidad["attributes"].get("latitude"),
+                    "longitud": entidad["attributes"].get("longitude"),
+                    "radio": entidad["attributes"].get("radius"),
+                })
+
+        return zonas

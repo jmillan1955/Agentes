@@ -6,6 +6,7 @@ from agente_familia.src.tools import (
     generar_informe_localizacion,
     generar_informe_anomalias,
     generar_informe_persona,
+    avisar_anomalias_familia,
 )
 from agente_familia.src.events import detectar_llegada_mari_a_casa
 
@@ -69,6 +70,9 @@ def responder_local(pregunta: str) -> str:
     # Estado general familia
     if contiene_alguna(p, ["familia", "cada uno", "donde estan", "donde esta", "situacion"]):
         return generar_informe_familia()
+
+    if contiene_alguna(p, ["avisa anomalias", "avisar anomalias", "notifica anomalias", "notificar anomalias"]):
+        return avisar_anomalias_familia()
 
     return (
         "No he entendido bien la pregunta.\n"

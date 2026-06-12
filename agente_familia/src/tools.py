@@ -2,9 +2,87 @@ from common.ha_client import HomeAssistantClient
 from agente_familia.src.models import PERSONAS, HOGARES, GEOCODED_SENSORS
 from agente_familia.src.models import HOGARES
 from datetime import datetime, timezone
-
-
+from agente_familia.src.notifications import notificar_familia
+import time
+from datetime import datetime
 MAX_HORAS_SIN_ACTUALIZAR = 12
+
+
+
+import time
+from datetime import datetime
+
+
+def solicitar_actualizacion_ubicacion(persona: str) -> bool:
+    """
+    Solicita una actualización GPS al móvil y devuelve
+    True si la entidad se ha actualizado.
+    """
+
+    ha = HomeAssistantClient()
+
+    entidades = {
+        "José": {
+            "notify": "mobile_app_movil_pepe",
+            "sensor": "person.jose",
+        },
+        "Mari": {
+            "notify": "mobile_app_mari_carmen",
+            "sensor": "person.mari",
+        },
+        "Jessica": {
+            "notify": "mobile_app_iphone_de_jess",
+            "sensor": "person.jessica",
+        },
+        "Javi": {
+            "notify": "mobile_app_javi_movil",
+            "sensor": "person.javi",
+        },
+    }
+
+    config = entidades.get(persona)
+
+    if not config:
+        return False
+
+    estado_inicial = ha.get_state(config["sensor"])
+    last_updated_inicial = estado_inicial.get("last_updated")
+
+    print(
+        f"[UBICACION] {persona} "
+        f"last_updated inicial={last_updated_inicial}"
+    )
+
+    ha.call_service(
+        "notify",
+        config["notify"],
+        {
+            "message": "request_location_update"
+        },
+    )
+
+    print(f"[UBICACION] Solicitud enviada a {persona}")
+
+    time.sleep(30)
+
+    estado_final = ha.get_state(config["sensor"])
+    last_updated_final = estado_final.get("last_updated")
+
+    print(
+        f"[UBICACION] {persona} "
+        f"last_updated final={last_updated_final}"
+    )
+
+    if last_updated_final != last_updated_inicial:
+        print(
+            f"[UBICACION] Actualización correcta para {persona}"
+        )
+        return True
+
+    print(
+        f"[UBICACION] No se ha detectado actualización para {persona}"
+    )
+    return False
 
 
 def horas_desde(fecha_iso: str) -> float | None:
@@ -281,3 +359,48 @@ def generar_informe_persona(nombre_buscado: str) -> str:
             return "\n".join(lineas)
 
     return f"No encuentro información de {nombre_buscado}."
+
+
+def avisar_anomalias_familia() -> str:
+    familia = leer_familia()
+    avisos = []
+
+    for persona in familia:
+        nombre = persona["nombre"]
+        ultima = persona["ultima_actualizacion"]
+        horas = horas_desde(ultima)
+
+        if horas is not None and horas > 4:
+            mensaje = (
+                f"{nombre} lleva {horas:.1f} horas sin actualizar su ubicación.\n\n"
+                "Revisar la app de Home Assistant, permisos de ubicación "
+                "o conexión del móvil."
+            )
+
+            notificar_familia(
+                titulo="Agente Familia",
+                mensaje=mensaje,
+                personas=[nombre.lower()],
+            )
+
+            avisos.append(f"Aviso enviado por {nombre}")
+
+    for persona in familia:
+        nombre = persona["nombre"]
+        ultima = persona["ultima_actualizacion"]
+        horas = horas_desde(ultima)
+
+        avisos.append(
+            f"{nombre}: ultima={ultima} horas={horas}"
+        )
+
+
+
+    if not avisos:
+        return "No hay anomalías de ubicación superiores a 4 horas."
+
+
+
+
+
+    return "\n".join(avisos)
