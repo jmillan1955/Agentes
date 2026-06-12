@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from agente_familia.src.agent import responder
 from agente_familia.src.ai_agent import responder_con_ia
 from agente_familia.src.local_ai import responder_local
-
+from agente_familia.src.seguimiento import ejecutar_seguimientos
 
 load_dotenv()
 
@@ -76,4 +76,14 @@ def preguntar_local(
 
     return {
         "respuesta": responder_local(datos.pregunta)
+    }
+
+@app.post("/seguimiento/ejecutar")
+def ejecutar_seguimiento_manual(
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "resultado": ejecutar_seguimientos()
     }
