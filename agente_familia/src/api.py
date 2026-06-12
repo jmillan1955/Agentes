@@ -6,8 +6,13 @@ from dotenv import load_dotenv
 from agente_familia.src.agent import responder
 from agente_familia.src.ai_agent import responder_con_ia
 from agente_familia.src.local_ai import responder_local
-from agente_familia.src.seguimiento import ejecutar_seguimientos
 
+from agente_familia.src.seguimiento import (
+    ejecutar_seguimientos,
+    iniciar_seguimiento,
+    detener_seguimiento,
+    listar_seguimientos,
+)
 load_dotenv()
 
 API_KEY = os.getenv("AGENTE_API_KEY")
@@ -21,7 +26,8 @@ app = FastAPI(
 
 class PreguntaRequest(BaseModel):
     pregunta: str
-
+class SeguimientoRequest(BaseModel):
+    persona: str
 
 def validar_api_key(x_api_key: str | None):
     if not API_KEY:
@@ -80,6 +86,47 @@ def preguntar_local(
 
 @app.post("/seguimiento/ejecutar")
 def ejecutar_seguimiento_manual(
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "resultado": ejecutar_seguimientos()
+    }
+
+@app.get("/seguimiento/listar")
+def seguimiento_listar(
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "seguimientos": listar_seguimientos()
+    }
+
+
+@app.post("/seguimiento/iniciar")
+def seguimiento_iniciar(
+    datos: SeguimientoRequest,
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return iniciar_seguimiento(datos.persona)
+
+
+@app.post("/seguimiento/detener")
+def seguimiento_detener(
+    datos: SeguimientoRequest,
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return detener_seguimiento(datos.persona)
+
+
+@app.post("/seguimiento/ejecutar")
+def seguimiento_ejecutar(
     x_api_key: str | None = Header(default=None)
 ):
     validar_api_key(x_api_key)

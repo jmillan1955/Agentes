@@ -19,6 +19,71 @@ def cargar_seguimientos() -> dict:
         return json.load(f)
 
 
+
+def guardar_seguimientos(seguimientos: dict) -> None:
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(seguimientos, f, ensure_ascii=False, indent=2)
+
+
+def listar_seguimientos() -> dict:
+    return cargar_seguimientos()
+
+
+def iniciar_seguimiento(persona: str) -> dict:
+    alias = persona.lower().strip()
+
+    if alias not in SEGUIMIENTO_PERSONAS:
+        return {
+            "ok": False,
+            "mensaje": f"Persona no reconocida: {persona}",
+            "seguimientos": cargar_seguimientos(),
+        }
+
+    seguimientos = cargar_seguimientos()
+
+    seguimientos[alias] = {
+        "activo": True
+    }
+
+    guardar_seguimientos(seguimientos)
+
+    return {
+        "ok": True,
+        "mensaje": f"Seguimiento iniciado para {alias}",
+        "seguimientos": seguimientos,
+    }
+
+
+def detener_seguimiento(persona: str) -> dict:
+    alias = persona.lower().strip()
+
+    if alias not in SEGUIMIENTO_PERSONAS:
+        return {
+            "ok": False,
+            "mensaje": f"Persona no reconocida: {persona}",
+            "seguimientos": cargar_seguimientos(),
+        }
+
+    seguimientos = cargar_seguimientos()
+
+    if alias not in seguimientos:
+        seguimientos[alias] = {
+            "activo": False
+        }
+    else:
+        seguimientos[alias]["activo"] = False
+
+    guardar_seguimientos(seguimientos)
+
+    return {
+        "ok": True,
+        "mensaje": f"Seguimiento detenido para {alias}",
+        "seguimientos": seguimientos,
+    }
+
+
 def extraer_location(atributos: dict) -> list[float] | None:
     location = atributos.get("Location") or atributos.get("location")
 
@@ -93,11 +158,6 @@ def obtener_posicion(nombre: str) -> dict | None:
         "last_changed": datos_persona.get("last_changed"),
         "last_updated": datos_persona.get("last_updated"),
     }
-
-
-
-
-
 
 
 def leer_zonas() -> list[dict]:
