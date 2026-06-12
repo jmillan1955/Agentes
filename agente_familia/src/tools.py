@@ -8,13 +8,12 @@ from datetime import datetime
 MAX_HORAS_SIN_ACTUALIZAR = 12
 
 
+import time
 
-def solicitar_actualizacion_ubicacion(persona: str) -> bool:
-    """
-    Solicita una actualización GPS al móvil y devuelve
-    True si la entidad se ha actualizado.
-    """
+from common.ha_client import HomeAssistantClient
 
+
+def solicitar_actualizacion_ubicacion(persona: str, modo: str = "location") -> bool:
     ha = HomeAssistantClient()
 
     entidades = {
@@ -39,56 +38,81 @@ def solicitar_actualizacion_ubicacion(persona: str) -> bool:
     config = entidades.get(persona)
 
     if not config:
+        print(f"[UBICACION] Persona no reconocida: {persona}")
         return False
 
     estado_inicial = ha.get_state(config["sensor"])
     last_updated_inicial = estado_inicial.get("last_updated")
 
-    print(
-        f"[UBICACION] {persona} "
-        f"last_updated inicial={last_updated_inicial}"
-    )
+    print(f"[UBICACION] {persona} last_updated inicial={last_updated_inicial}")
+    print(f"[UBICACION] modo={modo}")
 
-    ha.call_service(
-        "notify",
-        config["notify"],
-        {
-            "message": "command_update_sensors"
-        },
-    )
-    print("[UBICACION] command_update_sensors")
-    time.sleep(5)
+    payload_prioritario = {
+        "priority": "high",
+        "ttl": 0,
+    }
 
-    ha.call_service(
-        "notify",
-        config["notify"],
-        {
-            "message": "request_location_update"
-        },
-    )
-    print("[UBICACION] request_location_update")
-    print(f"[UBICACION] Solicitud enviada a {persona}")
+    if modo == "sensors":
+        ha.call_service(
+            "notify",
+            config["notify"],
+            {
+                "message": "command_update_sensors",
+                "data": payload_prioritario,
+            },
+        )
 
-    time.sleep(60)
-    print("[UBICACION] esperando 30 segundos")
+    elif modo == "location":
+        ha.call_service(
+            "notify",
+            config["notify"],
+            {
+                "message": "request_location_update",
+                "data": payload_prioritario,
+            },
+        )
+
+    elif modo == "ambos":
+        ha.call_service(
+            "notify",
+            config["notify"],
+            {
+                "message": "command_update_sensors",
+                "data": payload_prioritario,
+            },
+        )
+
+        time.sleep(5)
+
+        ha.call_service(
+            "notify",
+            config["notify"],
+            {
+                "message": "request_location_update",
+                "data": payload_prioritario,
+            },
+        )
+
+    else:
+        print(f"[UBICACION] modo no válido: {modo}")
+        return False
+
+    print("[UBICACION] Esperando 30 segundos")
+    time.sleep(30)
+
     estado_final = ha.get_state(config["sensor"])
     last_updated_final = estado_final.get("last_updated")
 
-    print(
-        f"[UBICACION] {persona} "
-        f"last_updated final={last_updated_final}"
-    )
+    print(f"[UBICACION] {persona} last_updated final={last_updated_final}")
 
     if last_updated_final != last_updated_inicial:
-        print(
-            f"[UBICACION] Actualización correcta para {persona}"
-        )
+        print(f"[UBICACION] Actualización correcta para {persona}")
         return True
 
-    print(
-        f"[UBICACION] No se ha detectado actualización para {persona}"
-    )
+    print(f"[UBICACION] No se ha detectado actualización para {persona}")
     return False
+
+
 
 
 def horas_desde(fecha_iso: str) -> float | None:

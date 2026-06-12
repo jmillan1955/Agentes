@@ -1,0 +1,11 @@
+[Unit]
+Description=Agente Familia Seguimiento
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jose-millan
+WorkingDirectory=/home/jose-millan/Agentes
+EnvironmentFile=/home/jose-millan/Agentes/.env
+ExecStart=/home/jose-millan/Agentes/.venv/bin/python -m agente_familia.src.seguimiento
