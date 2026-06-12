@@ -9,10 +9,6 @@ MAX_HORAS_SIN_ACTUALIZAR = 12
 
 
 
-import time
-from datetime import datetime
-
-
 def solicitar_actualizacion_ubicacion(persona: str) -> bool:
     """
     Solicita una actualización GPS al móvil y devuelve
