@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 
 from common.ha_client import HomeAssistantClient
-from agente_familia.src.models import GEOCODED_SENSORS, SEGUIMIENTO_PERSONAS
+from agente_familia.src.models import GEOCODED_SENSORS, SEGUIMIENTO_PERSONAS, PERSON_ENTITY_IDS
 from agente_familia.src.notifications import notificar_familia
 
 
