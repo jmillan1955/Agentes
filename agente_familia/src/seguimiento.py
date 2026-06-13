@@ -382,18 +382,46 @@ def actualizar_entidades_persona(nombre: str) -> list[str]:
 
 
 def iniciar_timer_seguimiento() -> None:
-    subprocess.run(
-        ["sudo", "-n", "/usr/bin/systemctl", "start", "agente-familia-seguimiento.timer"],
-        check=True,
+    print("[SEGUIMIENTO] Arrancando timer seguimiento")
+
+    resultado = subprocess.run(
+        [
+            "sudo",
+            "-n",
+            "/usr/bin/systemctl",
+            "start",
+            "agente-familia-seguimiento.timer",
+        ],
+        capture_output=True,
+        text=True,
     )
 
+    print(f"[SEGUIMIENTO] systemctl start returncode={resultado.returncode}")
+    print(f"[SEGUIMIENTO] stdout={resultado.stdout}")
+    print(f"[SEGUIMIENTO] stderr={resultado.stderr}")
+
+    resultado.check_returncode()
 
 def detener_timer_seguimiento() -> None:
-    subprocess.run(
-        ["sudo", "-n", "/usr/bin/systemctl", "stop", "agente-familia-seguimiento.timer"],
-        check=True,
+    print("[SEGUIMIENTO] Parando timer seguimiento")
+
+    resultado = subprocess.run(
+        [
+            "sudo",
+            "-n",
+            "/usr/bin/systemctl",
+            "stop",
+            "agente-familia-seguimiento.timer",
+        ],
+        capture_output=True,
+        text=True,
     )
 
+    print(f"[SEGUIMIENTO] systemctl stop returncode={resultado.returncode}")
+    print(f"[SEGUIMIENTO] stdout={resultado.stdout}")
+    print(f"[SEGUIMIENTO] stderr={resultado.stderr}")
+
+    resultado.check_returncode()
 
 def hay_seguimientos_activos(seguimientos: dict) -> bool:
     return any(
