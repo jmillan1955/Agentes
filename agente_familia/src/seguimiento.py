@@ -382,7 +382,6 @@ def actualizar_entidades_persona(nombre: str) -> list[str]:
 
 
 def iniciar_timer_seguimiento() -> None:
-    print("[SEGUIMIENTO] Arrancando timer seguimiento")
 
     resultado = subprocess.run(
         [
@@ -396,15 +395,10 @@ def iniciar_timer_seguimiento() -> None:
         text=True,
     )
 
-    print(f"[SEGUIMIENTO] systemctl start returncode={resultado.returncode}")
-    print(f"[SEGUIMIENTO] stdout={resultado.stdout}")
-    print(f"[SEGUIMIENTO] stderr={resultado.stderr}")
-
     resultado.check_returncode()
 
 def detener_timer_seguimiento() -> None:
-    print("[SEGUIMIENTO] Parando timer seguimiento")
-
+ 
     resultado = subprocess.run(
         [
             "sudo",
@@ -416,10 +410,6 @@ def detener_timer_seguimiento() -> None:
         capture_output=True,
         text=True,
     )
-
-    print(f"[SEGUIMIENTO] systemctl stop returncode={resultado.returncode}")
-    print(f"[SEGUIMIENTO] stdout={resultado.stdout}")
-    print(f"[SEGUIMIENTO] stderr={resultado.stderr}")
 
     resultado.check_returncode()
 
