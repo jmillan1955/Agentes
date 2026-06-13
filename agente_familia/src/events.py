@@ -6,8 +6,7 @@ from datetime import datetime, timezone
 from common.ha_client import HomeAssistantClient
 from agente_familia.src.models import HOGARES, SENSORES_ACCESO_CASA
 from agente_familia.src.tools import leer_familia
-from agente_familia.src.notifications import avisar_jessica
-
+from agente_familia.src.notifications import notificar_familia
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 ESTADO_ANTERIOR_FILE = DATA_DIR / "estado_anterior.json"
 
@@ -101,68 +100,132 @@ def buscar_persona(familia: list[dict], nombre: str) -> dict | None:
 
     return None
 
-
-def detectar_llegada_mari_a_casa() -> str:
+def detectar_llegada_a_casa(persona: str) -> str:
     familia = leer_familia()
     estado_anterior = cargar_estado_anterior()
 
-    mari = buscar_persona(familia, "Mari")
-    casa = HOGARES["Casa"]
+    alias = persona.lower().strip()
 
-    if not mari:
+    config_personas = {
+        "pepe": {
+            "nombre": "José",
+            "nombre_mensaje": "Pepe",
+            "hogar": "Casa",
+            "requiere_puerta": True,
+        },
+        "jose": {
+            "nombre": "José",
+            "nombre_mensaje": "Pepe",
+            "hogar": "Casa",
+            "requiere_puerta": True,
+        },
+        "josé": {
+            "nombre": "José",
+            "nombre_mensaje": "Pepe",
+            "hogar": "Casa",
+            "requiere_puerta": True,
+        },
+        "mari": {
+            "nombre": "Mari",
+            "nombre_mensaje": "Mari",
+            "hogar": "Casa",
+            "requiere_puerta": True,
+        },
+        "jessica": {
+            "nombre": "Jessica",
+            "nombre_mensaje": "Jessica",
+            "hogar": "Casa Jessi",
+            "requiere_puerta": False,
+        },
+        "javi": {
+            "nombre": "Javi",
+            "nombre_mensaje": "Javi",
+            "hogar": "Casa Jessi",
+            "requiere_puerta": False,
+        },
+    }
+
+    config = config_personas.get(alias)
+
+    if not config:
         guardar_estado_actual(familia)
-        return "No se encontró información de Mari."
+        return f"Persona no reconocida: {persona}"
 
-    mari_anterior = estado_anterior.get("Mari", {})
-    estado_anterior_mari = mari_anterior.get("estado")
+    nombre = config["nombre"]
+    nombre_mensaje = config["nombre_mensaje"]
+    hogar = HOGARES[config["hogar"]]
 
-    estaba_fuera = estado_anterior_mari != casa["zona"]
+    datos_persona = buscar_persona(familia, nombre)
 
-    esta_en_zona = mari["estado"] == casa["zona"]
+    if not datos_persona:
+        guardar_estado_actual(familia)
+        return f"No se encontró información de {nombre_mensaje}."
+
+    datos_anteriores = estado_anterior.get(nombre, {})
+    estado_anterior_persona = datos_anteriores.get("estado")
+
+    estaba_fuera = estado_anterior_persona != hogar["zona"]
+    esta_en_zona = datos_persona["estado"] == hogar["zona"]
 
     distancia = distancia_metros(
-        mari["latitud"],
-        mari["longitud"],
-        casa["latitud"],
-        casa["longitud"],
+        datos_persona["latitud"],
+        datos_persona["longitud"],
+        hogar["latitud"],
+        hogar["longitud"],
     )
 
     esta_cerca = (
         distancia is not None
-        and distancia <= casa["radio_metros"]
+        and distancia <= hogar["radio_metros"]
     )
 
-    puerta = puerta_abierta_recientemente()
+    puerta = None
+
+    if config["requiere_puerta"]:
+        puerta = puerta_abierta_recientemente()
 
     guardar_estado_actual(familia)
 
-    if estaba_fuera and puerta and (esta_en_zona or esta_cerca):
+    puerta_ok = True
+
+    if config["requiere_puerta"]:
+        puerta_ok = puerta is not None
+
+    if estaba_fuera and puerta_ok and (esta_en_zona or esta_cerca):
+        nombre_hogar = config["hogar"]
+
+        texto_puerta = ""
+        if config["requiere_puerta"]:
+            texto_puerta = (
+                f"\nPuerta reciente: sí "
+                f"({puerta['nombre']}, {puerta['minutos']:.1f} minutos)"
+            )
+
         mensaje = (
-            "¡Mari ha llegado a Casa!\n"
-            f"Estado anterior: {estado_anterior_mari}\n"
-            f"Estado actual: {mari['estado']}\n"
-            f"Distancia a Casa: {distancia:.0f} metros.\n"
-            f"Puerta reciente: sí ({puerta['nombre']}, {puerta['minutos']:.1f} minutos)\n"
+            f"{nombre_mensaje} ha vuelto a {nombre_hogar}.\n"
+            f"Estado anterior: {estado_anterior_persona}\n"
+            f"Estado actual: {datos_persona['estado']}\n"
+            f"Distancia a {nombre_hogar}: {distancia:.0f} metros."
+            f"{texto_puerta}"
         )
 
-        avisar_jessica(mensaje)
-
-        return (
-            "Evento detectado: Mari ha llegado a Casa.\n"
-            f"{aviso}"
+        notificar_familia(
+            titulo="Agente Familia",
+            mensaje=mensaje,
+            personas=[],
         )
 
+        return f"Evento detectado: {nombre_mensaje} ha vuelto a {nombre_hogar}."
 
+    texto_puerta = "no aplica"
 
-
-
-
-        
+    if config["requiere_puerta"]:
+        texto_puerta = "sí" if puerta else "no"
 
     return (
-        "No se detecta llegada de Mari a Casa.\n"
-        f"Estado anterior: {estado_anterior_mari}\n"
-        f"Estado actual: {mari['estado']}\n"
-        f"Distancia a Casa: {distancia:.0f} metros.\n"
-        f"Puerta reciente: {'sí' if puerta else 'no'}"
+        f"No se detecta llegada de {nombre_mensaje} a {config['hogar']}.\n"
+        f"Estado anterior: {estado_anterior_persona}\n"
+        f"Estado actual: {datos_persona['estado']}\n"
+        f"Distancia a {config['hogar']}: {distancia:.0f} metros.\n"
+        f"Puerta reciente: {texto_puerta}"
     )

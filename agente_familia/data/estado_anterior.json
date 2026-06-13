@@ -1,26 +1,26 @@
 {
   "José": {
     "estado": "home",
-    "latitud": 40.5523381,
-    "longitud": -3.9019888,
-    "ultima_actualizacion": "2026-06-11T06:34:36.333868+00:00"
+    "latitud": 40.552319,
+    "longitud": -3.9020178,
+    "ultima_actualizacion": "2026-06-13T16:30:52.004513+00:00"
   },
   "Mari": {
-    "estado": "Trabajo Mari",
-    "latitud": 40.430423010959466,
-    "longitud": -3.7002289552584404,
-    "ultima_actualizacion": "2026-06-11T05:17:03.077029+00:00"
+    "estado": "home",
+    "latitud": 40.55233970335072,
+    "longitud": -3.9019463740157,
+    "ultima_actualizacion": "2026-06-13T15:12:31.342356+00:00"
   },
   "Jessica": {
     "estado": "Casa Jessi",
-    "latitud": 40.47952483760725,
-    "longitud": -3.7177052080403477,
-    "ultima_actualizacion": "2026-06-09T07:56:39.236886+00:00"
+    "latitud": 40.4795290314524,
+    "longitud": -3.717709290930313,
+    "ultima_actualizacion": "2026-06-13T15:12:31.342404+00:00"
   },
   "Javi": {
     "estado": "Casa Jessi",
-    "latitud": 40.4795098,
-    "longitud": -3.7177685,
-    "ultima_actualizacion": "2026-06-09T07:56:39.236943+00:00"
+    "latitud": 40.4794868,
+    "longitud": -3.7177325,
+    "ultima_actualizacion": "2026-06-13T15:12:31.342453+00:00"
   }
 }

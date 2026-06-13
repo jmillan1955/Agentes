@@ -20,7 +20,10 @@ HOGARES = {
     "Casa Jessi": {
         "zona": "Casa Jessi",
         "personas": ["Jessica", "Javi"],
-    },
+        "latitud": 40.47952076159884,
+        "longitud": -3.717772386440377,
+        "radio_metros": 200,
+    }
 }
 
 GEOCODED_SENSORS = {

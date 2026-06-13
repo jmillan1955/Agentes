@@ -8,7 +8,7 @@ from agente_familia.src.tools import (
     generar_informe_persona,
     avisar_anomalias_familia,
 )
-from agente_familia.src.events import detectar_llegada_mari_a_casa
+from agente_familia.src.events import detectar_llegada_a_casa
 
 ALIAS_PERSONAS = {
     "jose": "José",
@@ -46,9 +46,7 @@ def responder_local(pregunta: str) -> str:
     ):
         return generar_informe_persona(persona)
     # Llegada de Mari
-    if "mari" in p and contiene_alguna(p, ["llega", "llegado", "vuelve", "vuelto"]):
-        return detectar_llegada_mari_a_casa()
-
+   
     # Anomalías
     if contiene_alguna(p, ["anomalia", "anomalias", "raro", "problema", "fallo"]):
         return generar_informe_anomalias()
@@ -73,6 +71,10 @@ def responder_local(pregunta: str) -> str:
 
     if contiene_alguna(p, ["avisa anomalias", "avisar anomalias", "notifica anomalias", "notificar anomalias"]):
         return avisar_anomalias_familia()
+
+    if "ha vuelto a casa" in p:
+        persona = p.replace("ha vuelto a casa", "").strip()
+        return detectar_llegada_a_casa(persona)
 
     return (
         "No he entendido bien la pregunta.\n"

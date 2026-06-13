@@ -6,7 +6,7 @@ from agente_familia.src.tools import (
     intentar_actualizar_ubicaciones,
 )
 
-from agente_familia.src.events import detectar_llegada_mari_a_casa
+from agente_familia.src.events import detectar_llegada_a_casa
 
 def responder(pregunta: str) -> str:
     pregunta = pregunta.lower()
@@ -30,9 +30,6 @@ def responder(pregunta: str) -> str:
     
     if "actualiza" in pregunta or "actualizar" in pregunta:
         return intentar_actualizar_ubicaciones()
-
-    if "mari" in pregunta and "llega" in pregunta:
-        return detectar_llegada_mari_a_casa()
 
     return "No sé responder todavía a esa pregunta."
 
