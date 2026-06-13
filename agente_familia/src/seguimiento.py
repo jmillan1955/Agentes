@@ -6,7 +6,7 @@ from datetime import datetime
 from common.ha_client import HomeAssistantClient
 from agente_familia.src.models import GEOCODED_SENSORS, SEGUIMIENTO_PERSONAS, PERSON_ENTITY_IDS
 from agente_familia.src.notifications import notificar_familia
-
+import subprocess
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "seguimientos.json"
 
@@ -48,6 +48,8 @@ def iniciar_seguimiento(persona: str) -> dict:
     }
 
     guardar_seguimientos(seguimientos)
+    iniciar_timer_seguimiento()
+
 
     return {
         "ok": True,
@@ -76,6 +78,9 @@ def detener_seguimiento(persona: str) -> dict:
         seguimientos[alias]["activo"] = False
 
     guardar_seguimientos(seguimientos)
+
+    if not hay_seguimientos_activos(seguimientos):
+        detener_timer_seguimiento()
 
     return {
         "ok": True,
@@ -375,6 +380,26 @@ def actualizar_entidades_persona(nombre: str) -> list[str]:
 
     return actualizadas
 
+
+def iniciar_timer_seguimiento() -> None:
+    subprocess.run(
+        ["sudo", "-n", "/usr/bin/systemctl", "start", "agente-familia-seguimiento.timer"],
+        check=True,
+    )
+
+
+def detener_timer_seguimiento() -> None:
+    subprocess.run(
+        ["sudo", "-n", "/usr/bin/systemctl", "stop", "agente-familia-seguimiento.timer"],
+        check=True,
+    )
+
+
+def hay_seguimientos_activos(seguimientos: dict) -> bool:
+    return any(
+        config.get("activo") is True
+        for config in seguimientos.values()
+    )
 
 if __name__ == "__main__":
     print(ejecutar_seguimientos())
