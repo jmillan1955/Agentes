@@ -12,6 +12,39 @@ ESTADO_ANTERIOR_FILE = DATA_DIR / "estado_anterior.json"
 
 VENTANA_PUERTA_MINUTOS = 10
 
+VENTANA_LLEGADA_MINUTOS = 2
+
+PERSONAS_CASA = {
+    "pepe": {
+        "nombre": "José",
+        "nombre_mensaje": "Pepe",
+        "hogar": "Casa",
+        "entity_id": "person.jose",
+    },
+    "mari": {
+        "nombre": "Mari",
+        "nombre_mensaje": "Mari",
+        "hogar": "Casa",
+        "entity_id": "person.mari",
+    },
+}
+
+PERSONAS_CASA_JESSI = {
+    "javi": {
+        "nombre": "Javi",
+        "nombre_mensaje": "Javi",
+        "hogar": "Casa Jessi",
+        "entity_id": "person.javi",
+        "seguimiento": "input_boolean.seguimiento_javi",
+    },
+    "jessica": {
+        "nombre": "Jessica",
+        "nombre_mensaje": "Jessica",
+        "hogar": "Casa Jessi",
+        "entity_id": "person.jessica",
+        "seguimiento": "input_boolean.seguimiento_jessica",
+    },
+}
 
 def cargar_estado_anterior() -> dict:
     if not ESTADO_ANTERIOR_FILE.exists():
@@ -100,7 +133,9 @@ def buscar_persona(familia: list[dict], nombre: str) -> dict | None:
 
     return None
 
+
 def detectar_llegada_a_casa(persona: str) -> str:
+
     familia = leer_familia()
     estado_anterior = cargar_estado_anterior()
 
@@ -223,9 +258,141 @@ def detectar_llegada_a_casa(persona: str) -> str:
         texto_puerta = "sí" if puerta else "no"
 
     return (
+
         f"No se detecta llegada de {nombre_mensaje} a {config['hogar']}.\n"
         f"Estado anterior: {estado_anterior_persona}\n"
         f"Estado actual: {datos_persona['estado']}\n"
         f"Distancia a {config['hogar']}: {distancia:.0f} metros.\n"
         f"Puerta reciente: {texto_puerta}"
     )
+
+def minutos_desde_cambio_entidad(entity_id: str) -> float | None:
+    ha = HomeAssistantClient()
+    datos = ha.get_state(entity_id)
+
+    if not datos:
+        return None
+
+    return minutos_desde(datos.get("last_changed"))
+
+
+def detectar_llegada_por_puerta() -> str:
+    familia = leer_familia()
+    puerta = puerta_abierta_recientemente()
+
+    if not puerta:
+        return "No hay puerta de acceso abierta recientemente."
+
+    eventos = []
+
+    for config in PERSONAS_CASA.values():
+        nombre = config["nombre"]
+        nombre_mensaje = config["nombre_mensaje"]
+        nombre_hogar = config["hogar"]
+        hogar = HOGARES[nombre_hogar]
+
+        datos_persona = buscar_persona(familia, nombre)
+
+        if not datos_persona:
+            continue
+
+        esta_en_casa = datos_persona["estado"] == hogar["zona"]
+        minutos_home = minutos_desde_cambio_entidad(config["entity_id"])
+
+        if (
+            esta_en_casa
+            and minutos_home is not None
+            and minutos_home <= VENTANA_LLEGADA_MINUTOS
+        ):
+            distancia = distancia_metros(
+                datos_persona["latitud"],
+                datos_persona["longitud"],
+                hogar["latitud"],
+                hogar["longitud"],
+            )
+
+            mensaje = (
+                f"{nombre_mensaje} ha vuelto a {nombre_hogar}.\n"
+                f"Estado actual: {datos_persona['estado']}\n"
+                f"Tiempo desde llegada a zona: {minutos_home:.1f} minutos.\n"
+                f"Distancia a {nombre_hogar}: {distancia:.0f} metros.\n"
+                f"Puerta reciente: sí "
+                f"({puerta['nombre']}, {puerta['minutos']:.1f} minutos)"
+            )
+
+            notificar_familia(
+                titulo="Agente Familia",
+                mensaje=mensaje,
+                personas=[],
+            )
+
+            eventos.append(
+                f"{nombre_mensaje} ha vuelto a {nombre_hogar}"
+            )
+
+    if eventos:
+        return "Eventos detectados: " + ", ".join(eventos)
+
+    return (
+        "Puerta abierta, pero no se detecta llegada familiar válida. "
+        "Nadie de Casa ha cambiado a home en los últimos "
+        f"{VENTANA_LLEGADA_MINUTOS} minutos."
+    )
+
+
+
+def detectar_llegada_por_seguimiento(persona: str) -> str:
+    familia = leer_familia()
+    alias = persona.lower().strip()
+
+    config = PERSONAS_CASA_JESSI.get(alias)
+
+    if not config:
+        return f"Persona no válida para llegada por seguimiento: {persona}"
+
+    ha = HomeAssistantClient()
+
+    seguimiento_activo = ha.get_state(config["seguimiento"]).get("state") == "on"
+
+    if not seguimiento_activo:
+        return f"Seguimiento no activo para {config['nombre_mensaje']}."
+
+    nombre = config["nombre"]
+    nombre_mensaje = config["nombre_mensaje"]
+    nombre_hogar = config["hogar"]
+    hogar = HOGARES[nombre_hogar]
+
+    datos_persona = buscar_persona(familia, nombre)
+
+    if not datos_persona:
+        return f"No se encontró información de {nombre_mensaje}."
+
+    esta_en_zona = datos_persona["estado"] == hogar["zona"]
+
+    if not esta_en_zona:
+        return (
+            f"{nombre_mensaje} no está en {nombre_hogar}. "
+            f"Estado actual: {datos_persona['estado']}."
+        )
+
+    distancia = distancia_metros(
+        datos_persona["latitud"],
+        datos_persona["longitud"],
+        hogar["latitud"],
+        hogar["longitud"],
+    )
+
+    mensaje = (
+        f"{nombre_mensaje} ha llegado a {nombre_hogar}.\n"
+        f"Seguimiento activo: sí.\n"
+        f"Estado actual: {datos_persona['estado']}.\n"
+        f"Distancia a {nombre_hogar}: {distancia:.0f} metros."
+    )
+
+    notificar_familia(
+        titulo="Agente Familia",
+        mensaje=mensaje,
+        personas=[alias],
+    )
+
+    return f"Evento detectado: {nombre_mensaje} ha llegado a {nombre_hogar}."

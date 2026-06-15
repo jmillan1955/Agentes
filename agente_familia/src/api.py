@@ -13,6 +13,12 @@ from agente_familia.src.seguimiento import (
     detener_seguimiento,
     listar_seguimientos,
 )
+
+from agente_familia.src.events import (
+    detectar_llegada_por_puerta,
+    detectar_llegada_por_seguimiento,
+)
+
 load_dotenv()
 
 API_KEY = os.getenv("AGENTE_API_KEY")
@@ -84,15 +90,6 @@ def preguntar_local(
         "respuesta": responder_local(datos.pregunta)
     }
 
-@app.post("/seguimiento/ejecutar")
-def ejecutar_seguimiento_manual(
-    x_api_key: str | None = Header(default=None)
-):
-    validar_api_key(x_api_key)
-
-    return {
-        "resultado": ejecutar_seguimientos()
-    }
 
 @app.get("/seguimiento/listar")
 def seguimiento_listar(
@@ -133,4 +130,26 @@ def seguimiento_ejecutar(
 
     return {
         "resultado": ejecutar_seguimientos()
+    }
+
+@app.post("/llegadas/confirmar_por_puerta")
+def llegada_confirmar_por_puerta(
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "resultado": detectar_llegada_por_puerta()
+    }
+
+
+@app.post("/llegadas/por_seguimiento")
+def llegada_por_seguimiento(
+    datos: SeguimientoRequest,
+    x_api_key: str | None = Header(default=None)
+):
+    validar_api_key(x_api_key)
+
+    return {
+        "resultado": detectar_llegada_por_seguimiento(datos.persona)
     }
