@@ -50,15 +50,19 @@ def nombre_entidad(datos):
     "/seguridad/evaluar_armado_ausente",
     response_model=EvaluarArmadoAusenteResponse,
 )
+
 def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
     pepe = leer_estado("person.jose")
     mari = leer_estado("person.mari")
+    alarmo = leer_estado("alarm_control_panel.alarmo")
 
     estado_pepe = pepe.get("state")
     estado_mari = mari.get("state")
+    estado_alarmo = alarmo.get("state")
 
     casa_vacia = estado_pepe != "home" and estado_mari != "home"
-
+    alarmo_desarmado = estado_alarmo == "disarmed"
+    
     sensores_abiertos = []
     sensores_error = []
 
@@ -91,11 +95,14 @@ def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
 
     puede_armar = (
         casa_vacia
+        and alarmo_desarmado
         and len(sensores_abiertos) == 0
         and len(sensores_error) == 0
     )
 
     if not casa_vacia:
+        motivo = "casa_ocupada"
+        riesgo = "normal"
         resumen = (
             "SIMULACIÓN: No se recomienda armar Alarmo Ausente porque "
             f"la casa no parece vacía. Pepe={estado_pepe}, Mari={estado_mari}."
@@ -103,6 +110,8 @@ def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
         accion = "no_armar"
 
     elif sensores_error:
+        motivo = "sensores_error"
+        riesgo = "alerta"
         nombres = ", ".join([s.nombre for s in sensores_error])
         resumen = (
             "SIMULACIÓN: La casa parece vacía, pero no se recomienda armar "
@@ -111,6 +120,8 @@ def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
         accion = "no_armar"
 
     elif sensores_abiertos:
+        motivo = "sensores_abiertos"
+        riesgo = "aviso"
         nombres = ", ".join([s.nombre for s in sensores_abiertos])
         resumen = (
             "SIMULACIÓN: La casa parece vacía, pero no se recomienda armar "
@@ -118,7 +129,19 @@ def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
         )
         accion = "no_armar"
 
+    elif not alarmo_desarmado:
+        motivo = "alarmo_no_desarmado"
+        riesgo = "normal"
+        resumen = (
+            "SIMULACIÓN: La casa parece vacía, pero no se recomienda armar "
+            f"porque Alarmo ya no está desarmado. Estado actual: {estado_alarmo}."
+        )
+        accion = "no_armar"
+
+
     else:
+        motivo = "armado_ausente_posible"
+        riesgo = "normal"
         resumen = (
             "SIMULACIÓN: La casa parece vacía y todos los sensores de contacto "
             "están cerrados. Se podría armar Alarmo Ausente."
@@ -145,9 +168,12 @@ def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
         casa_vacia=casa_vacia,
         pepe=estado_pepe,
         mari=estado_mari,
+        alarmo=estado_alarmo,
         puede_armar=puede_armar,
         accion=accion,
         sensores_abiertos=sensores_abiertos,
         sensores_error=sensores_error,
         resumen=resumen,
+        motivo=motivo,
+        riesgo=riesgo,
     )

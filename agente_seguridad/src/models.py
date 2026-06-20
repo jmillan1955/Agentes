@@ -18,8 +18,11 @@ class EvaluarArmadoAusenteResponse(BaseModel):
     casa_vacia: bool
     pepe: str
     mari: str
+    alarmo: str
     puede_armar: bool
     accion: str
+    motivo: str
+    riesgo: str
     sensores_abiertos: List[SensorEstado]
     sensores_error: List[SensorEstado]
     resumen: str
