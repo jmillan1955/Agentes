@@ -176,4 +176,5 @@ def evaluar_armado_ausente(req: EvaluarArmadoAusenteRequest):
         resumen=resumen,
         motivo=motivo,
         riesgo=riesgo,
+        version="0.4.0"
     )
