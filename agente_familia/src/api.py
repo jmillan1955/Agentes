@@ -23,6 +23,8 @@ load_dotenv()
 
 API_KEY = os.getenv("AGENTE_API_KEY")
 
+class ConfirmarLlegadaRequest(BaseModel):
+    notificar: bool = True
 
 app = FastAPI(
     title="Agente Familia",
@@ -134,12 +136,18 @@ def seguimiento_ejecutar(
 
 @app.post("/llegadas/confirmar_por_puerta")
 def llegada_confirmar_por_puerta(
+    req: ConfirmarLlegadaRequest,
     x_api_key: str | None = Header(default=None)
 ):
     validar_api_key(x_api_key)
 
+    resultado = detectar_llegada_por_puerta(
+            notificar=req.notificar
+        )
+
     return {
-        "resultado": detectar_llegada_por_puerta()
+        "resultado": resultado,
+        "notificado": req.notificar
     }
 
 

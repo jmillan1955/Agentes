@@ -276,7 +276,7 @@ def minutos_desde_cambio_entidad(entity_id: str) -> float | None:
     return minutos_desde(datos.get("last_changed"))
 
 
-def detectar_llegada_por_puerta() -> str:
+def detectar_llegada_por_puerta(notificar: bool = True) -> str:
     familia = leer_familia()
     puerta = puerta_abierta_recientemente()
 
@@ -320,11 +320,12 @@ def detectar_llegada_por_puerta() -> str:
                 f"({puerta['nombre']}, {puerta['minutos']:.1f} minutos)"
             )
 
-            notificar_familia(
-                titulo="Agente Familia",
-                mensaje=mensaje,
-                personas=[],
-            )
+            if notificar:
+                notificar_familia(
+                    titulo="Agente Familia",
+                    mensaje=mensaje,
+                    personas=[],
+                )
 
             eventos.append(
                 f"{nombre_mensaje} ha vuelto a {nombre_hogar}"
@@ -338,8 +339,6 @@ def detectar_llegada_por_puerta() -> str:
         "Nadie de Casa ha cambiado a home en los últimos "
         f"{VENTANA_LLEGADA_MINUTOS} minutos."
     )
-
-
 
 def detectar_llegada_por_seguimiento(persona: str) -> str:
     familia = leer_familia()
