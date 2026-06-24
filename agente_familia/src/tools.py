@@ -2,7 +2,6 @@ from common.ha_client import HomeAssistantClient
 from agente_familia.src.models import PERSONAS, HOGARES, GEOCODED_SENSORS
 from agente_familia.src.models import HOGARES
 from datetime import datetime, timezone
-from agente_familia.src.notifications import notificar_familia
 import time
 from datetime import datetime
 MAX_HORAS_SIN_ACTUALIZAR = 12
@@ -405,12 +404,6 @@ def avisar_anomalias_familia() -> str:
                 f"{nombre} lleva {horas:.1f} horas sin actualizar su ubicación.\n\n"
                 "Revisar la app de Home Assistant, permisos de ubicación "
                 "o conexión del móvil."
-            )
-
-            notificar_familia(
-                titulo="Agente Familia",
-                mensaje=mensaje,
-                personas=[nombre.lower()],
             )
 
             avisos.append(f"Aviso enviado por {nombre}")

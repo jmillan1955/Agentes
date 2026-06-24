@@ -5,7 +5,6 @@ from datetime import datetime
 
 from common.ha_client import HomeAssistantClient
 from agente_familia.src.models import GEOCODED_SENSORS, SEGUIMIENTO_PERSONAS, PERSON_ENTITY_IDS
-from agente_familia.src.notifications import notificar_familia
 import subprocess
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "seguimientos.json"
@@ -315,12 +314,6 @@ def ejecutar_seguimientos() -> str:
             continue
 
         mensaje = crear_mensaje_seguimiento(nombre, posicion)
-
-        notificar_familia(
-            titulo="Agente Familia - Seguimiento",
-            mensaje=mensaje,
-            personas=[alias],
-        )
 
         avisos.append(f"Enviado seguimiento de {nombre}")
 

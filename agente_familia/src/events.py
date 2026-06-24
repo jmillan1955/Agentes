@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from common.ha_client import HomeAssistantClient
 from agente_familia.src.models import HOGARES, SENSORES_ACCESO_CASA
 from agente_familia.src.tools import leer_familia
-from agente_familia.src.notifications import notificar_familia
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 ESTADO_ANTERIOR_FILE = DATA_DIR / "estado_anterior.json"
 
@@ -244,12 +243,6 @@ def detectar_llegada_a_casa(persona: str) -> str:
             f"{texto_puerta}"
         )
 
-        notificar_familia(
-            titulo="Agente Familia",
-            mensaje=mensaje,
-            personas=[],
-        )
-
         return f"Evento detectado: {nombre_mensaje} ha vuelto a {nombre_hogar}."
 
     texto_puerta = "no aplica"
@@ -276,7 +269,7 @@ def minutos_desde_cambio_entidad(entity_id: str) -> float | None:
     return minutos_desde(datos.get("last_changed"))
 
 
-def detectar_llegada_por_puerta(notificar: bool = True) -> str:
+def detectar_llegada_por_puerta(notificar: bool = False) -> str:
     familia = leer_familia()
     puerta = puerta_abierta_recientemente()
 
@@ -320,12 +313,6 @@ def detectar_llegada_por_puerta(notificar: bool = True) -> str:
                 f"({puerta['nombre']}, {puerta['minutos']:.1f} minutos)"
             )
 
-            if notificar:
-                notificar_familia(
-                    titulo="Agente Familia",
-                    mensaje=mensaje,
-                    personas=[],
-                )
 
             eventos.append(
                 f"{nombre_mensaje} ha vuelto a {nombre_hogar}"
@@ -388,10 +375,5 @@ def detectar_llegada_por_seguimiento(persona: str) -> str:
         f"Distancia a {nombre_hogar}: {distancia:.0f} metros."
     )
 
-    notificar_familia(
-        titulo="Agente Familia",
-        mensaje=mensaje,
-        personas=[alias],
-    )
 
     return f"Evento detectado: {nombre_mensaje} ha llegado a {nombre_hogar}."
