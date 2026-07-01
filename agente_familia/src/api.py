@@ -142,13 +142,27 @@ def llegada_confirmar_por_puerta(
     validar_api_key(x_api_key)
 
     resultado = detectar_llegada_por_puerta(
-            notificar=req.notificar
-        )
+        notificar=req.notificar
+    )
+
+    llegada_confirmada = (
+        "ha llegado" in resultado
+        or "ha entrado" in resultado
+        or "llegada confirmada" in resultado.lower()
+    )
+
+    persona = None
+    if "Mari" in resultado:
+        persona = "Mari"
+    elif "Pepe" in resultado or "José" in resultado:
+        persona = "Pepe"
 
     return {
         "resultado": resultado,
-        "notificado": req.notificar
-    }
+        "llegada_confirmada": llegada_confirmada,
+        "persona": persona,
+        "notificado": req.notificar 
+    }	 
 
 
 @app.post("/llegadas/por_seguimiento")
