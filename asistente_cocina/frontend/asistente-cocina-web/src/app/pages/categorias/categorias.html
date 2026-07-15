@@ -1,0 +1,331 @@
+<!-- pages/categorias/categorias.html -->
+
+@if (!recetaEditando && !recetaCocinando) {
+
+  <main class="container py-4">
+
+    <h1 class="fs-4 fw-bold text-primary text-center mb-4">
+      Asistente Cocina
+    </h1>
+
+    <!-- Buscador -->
+    <div class="mx-auto mb-4" style="max-width: 520px;">
+      <div class="input-group">
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Buscar receta..."
+          [(ngModel)]="textoBusqueda"
+          name="textoBusqueda">
+
+        @if (hayBusqueda) {
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            (click)="limpiarBusqueda()">
+            ✖
+          </button>
+        }
+
+
+      </div>
+    </div>
+
+    <!-- Edición receta -->
+    @if (recetaFormularioEditando) {
+      <section class="mx-auto mb-4" style="max-width: 620px;">
+        <form
+          class="border rounded p-3 bg-light d-flex flex-column gap-2 text-start"
+          (ngSubmit)="guardarEdicionReceta()">
+
+          <div class="fw-semibold">
+            Editar receta
+          </div>
+
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Nombre receta"
+            name="editarNombre"
+            [(ngModel)]="editarNombre"
+            required>
+
+          <input
+            type="number"
+            class="form-control"
+            placeholder="Peso ración"
+            name="editarPesoRacion"
+            [(ngModel)]="editarPesoRacion"
+            required
+            min="1">
+
+          <div class="d-flex gap-2">
+            <button
+              type="submit"
+              class="btn btn-success flex-fill">
+              Guardar
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-outline-secondary flex-fill"
+              (click)="cancelarEdicionReceta()">
+              Cancelar
+            </button>
+          </div>
+
+        </form>
+      </section>
+    }
+
+    <!-- Nueva receta -->
+    <section class="mx-auto mb-4" style="max-width: 620px;">
+      <button
+        type="button"
+        class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center mb-2"
+        (click)="toggleNuevaReceta()">
+
+        <span class="fw-semibold">
+          Nueva receta
+        </span>
+
+        <span>
+          {{ mostrarFormularioNuevaReceta ? '▲' : '▼' }}
+        </span>
+      </button>
+
+      @if (mostrarFormularioNuevaReceta) {
+        <form
+          class="border rounded p-2 bg-light d-flex flex-column gap-2 text-start"
+          (ngSubmit)="guardarReceta()">
+
+          <div class="fw-semibold">
+            Datos de la receta
+          </div>
+
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Nombre receta"
+            name="nuevaRecetaNombre"
+            [(ngModel)]="nuevaRecetaNombre"
+            required>
+
+          <div class="d-flex gap-2">
+            <select
+              class="form-select"
+              name="nuevaRecetaCategoria"
+              [(ngModel)]="nuevaRecetaCategoria">
+
+              <option value="">
+                Seleccionar categoría...
+              </option>
+
+              @for (categoria of categorias; track categoria) {
+                <option [value]="categoria">
+                  {{ categoria }}
+                </option>
+              }
+            </select>
+
+            <input
+              type="text"
+              class="form-control"
+              placeholder="O nueva categoría"
+              name="nuevaCategoriaManual"
+              [(ngModel)]="nuevaCategoriaManual">
+          </div>
+
+          <input
+            type="number"
+            class="form-control"
+            placeholder="Peso ración"
+            name="nuevaRecetaPesoRacion"
+            [(ngModel)]="nuevaRecetaPesoRacion"
+            required
+            min="1">
+
+          <button
+            type="submit"
+            class="btn btn-success w-100">
+            Añadir receta
+          </button>
+        </form>
+      }
+    </section>
+
+    @if (cargando) {
+      <div class="alert alert-info text-center">
+        Cargando datos...
+      </div>
+    }
+
+    @if (error) {
+      <div class="alert alert-danger text-center">
+        {{ error }}
+      </div>
+    }
+
+    <!-- Resultados búsqueda -->
+    @if (!cargando && hayBusqueda) {
+      <section class="mx-auto mb-4" style="max-width: 620px;">
+        <h2 class="fs-6 fw-semibold mb-3">
+          Resultados de búsqueda
+        </h2>
+
+        @if (recetasFiltradas.length > 0) {
+          <div class="list-group">
+            @for (receta of recetasFiltradas; track receta.id) {
+              <div class="list-group-item d-flex justify-content-between align-items-center gap-2">
+
+                <button
+                  type="button"
+                  class="btn btn-link text-start text-decoration-none flex-grow-1 p-0"
+                  (click)="abrirReceta(receta)">
+                  {{ receta.nombre }}
+                </button>
+
+                <span class="badge text-bg-secondary">
+                  {{ receta.categoria }}
+                </span>
+
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  title="Editar receta"
+                  (click)="editarReceta(receta); $event.stopPropagation()">
+                  ✏️
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  title="Borrar receta"
+                  (click)="borrarReceta(receta); $event.stopPropagation()">
+                  🗑️
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-success"
+                  title="Cocinar receta"
+                  (click)="abrirCocinar(receta)">
+                  🍲
+                </button>
+
+              </div>
+            }
+          </div>
+        }
+
+        @if (recetasFiltradas.length === 0) {
+          <div class="alert alert-warning">
+            No se encontraron recetas
+          </div>
+        }
+      </section>
+    }
+
+    <!-- Categorías -->
+    @if (!cargando && !hayBusqueda) {
+      <section class="mx-auto" style="max-width: 620px;">
+        <h2 class="fs-6 fw-semibold mb-3 text-center">
+          Categorías
+        </h2>
+
+        <div class="accordion">
+          @for (categoria of categorias; track categoria) {
+            <div class="card shadow-sm mb-2">
+
+              <button
+                type="button"
+                class="card-header btn btn-light text-start d-flex justify-content-between align-items-center"
+                (click)="toggleCategoria(categoria)">
+
+                <span class="fw-semibold">
+                  {{ categoria === 'TODAS' ? 'Todas las recetas' : categoria }}
+                </span>
+
+                <span class="badge text-bg-primary">
+                  {{ recetasCategoria(categoria).length }}
+                </span>
+              </button>
+
+              @if (categoriasAbiertas[categoria]) {
+                <div class="card-body p-2">
+                  @if (recetasCategoria(categoria).length > 0) {
+                    <div class="list-group list-group-flush">
+
+                      @for (receta of recetasCategoria(categoria); track receta.id) {
+                        <div class="list-group-item d-flex justify-content-between align-items-center gap-2">
+
+                          <button
+                            type="button"
+                            class="btn btn-link text-start text-decoration-none flex-grow-1 p-0"
+                            (click)="abrirReceta(receta)">
+                            {{ receta.nombre }}
+                          </button>
+
+                          <small class="text-muted">
+                            {{ receta.pesoRacion || 0 }} g/ración
+                          </small>
+
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            title="Editar receta"
+                            (click)="editarReceta(receta); $event.stopPropagation()">
+                            ✏️
+                          </button>
+
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            title="Borrar receta"
+                            (click)="borrarReceta(receta); $event.stopPropagation()">
+                            🗑️
+                          </button>
+
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-success"
+                            title="Cocinar receta"
+                            (click)="abrirCocinar(receta)">
+                            🍲
+                          </button>
+
+                        </div>
+                      }
+
+                    </div>
+                  } @else {
+                    <div class="alert alert-warning mb-0">
+                      No hay recetas en esta categoría
+                    </div>
+                  }
+                </div>
+              }
+
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+  </main>
+
+} @else if (recetaEditando) {
+
+  <app-receta
+    [receta]="recetaEditando"
+    (volver)="volverDesdeReceta()">
+  </app-receta>
+
+} @else {
+
+  <app-cocinar
+    [receta]="recetaCocinando"
+    (volver)="volverDesdeCocinar()">
+  </app-cocinar>
+
+}

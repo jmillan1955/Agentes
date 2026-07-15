@@ -1,0 +1,359 @@
+<!-- pages/cocinar/cocinar.html -->
+
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+
+    <button
+      type="button"
+      class="btn btn-link text-decoration-none p-0"
+      (click)="volverAtras()">
+      ← Volver
+    </button>
+
+    <h1 class="fs-5 fw-bold text-primary m-0 text-center">
+      Cocinar {{ receta.nombre }}
+    </h1>
+
+    <span style="width: 60px;"></span>
+
+  </div>
+
+  @if (error) {
+    <div class="alert alert-danger">
+      {{ error }}
+    </div>
+  }
+
+  @if (!cocinando) {
+
+    <div class="card shadow-sm mb-3">
+
+      <div class="card-header fw-semibold">
+        Preparar receta
+      </div>
+
+      <div class="card-body d-flex flex-column gap-3 text-start">
+
+  <div>
+    Peso ración:
+    <strong>{{ receta.pesoRacion }} g</strong>
+  </div>
+
+     
+          <label class="form-label">
+            Número de raciones
+          </label>
+
+          <input
+            type="number"
+            class="form-control"
+            name="numeroRaciones"
+            [(ngModel)]="numeroRaciones">
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="calcularPesosIngredientes()">
+          Recalcular ingredientes
+        </button>
+
+     
+
+    </div>
+
+    @if (pesosCalculados.length > 0) {
+
+      <div class="card shadow-sm mb-3">
+
+        <div class="card-header d-flex justify-content-between align-items-center">
+
+          <span class="fw-semibold">
+            Ingredientes calculados
+          </span>
+
+          <small class="text-muted" class="fw-semibold">
+            Total: {{ pesoTotalIngredientes | number:'1.0-1' }} g
+          </small>
+
+        </div>
+
+        <div class="card-body p-2">
+
+          <div class="d-flex flex-column gap-2">
+
+            @for (ingrediente of pesosCalculados; track ingrediente.nombre) {
+              <div class="d-flex justify-content-between border rounded p-2">
+                <span>{{ ingrediente.nombre }}</span>                
+                  {{ ingrediente.peso | number:'1.0-1' }} g                
+              </div>
+            }
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-success w-100"
+        (click)="iniciarCocinado()">
+        Cocinar
+      </button>
+
+    }
+
+  } @else {
+
+    @if (mostrandoIngredientes) {
+
+      <div class="card shadow-sm mb-3">
+
+        <div class="card-header fw-semibold">
+          Preparar ingredientes
+        </div>
+
+        <div class="card-body p-2">
+
+          <div class="d-flex flex-column gap-2">
+
+            @for (ingrediente of pesosCalculados; track ingrediente.nombre) {
+              <div class="d-flex justify-content-between border rounded p-2">
+                <span>{{ ingrediente.nombre }}</span>
+
+                <strong>
+                  {{ ingrediente.peso | number:'1.0-1' }} g
+                </strong>
+              </div>
+            }
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- <button
+        type="button"
+        class="btn btn-primary w-100"
+        (click)="siguientePaso()">
+        Siguiente
+      </button> -->
+
+    } @else {
+
+      @if (pasoActual) {
+
+        <div class="card shadow-sm">
+
+          <div class="card-header fw-semibold">
+            {{ pasoActual.nombre }}
+          </div>
+
+          <div class="card-body text-start">
+
+            <div>
+              Duración:
+              <strong>{{ pasoActual.duracion }} min</strong>
+            </div>
+
+            <div>
+              Sonido:
+              <strong>{{ pasoActual.sonido }}</strong>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- <button
+          type="button"
+          class="btn btn-primary w-100 mt-3"
+          (click)="siguientePaso()">
+          Siguiente
+        </button> -->
+
+      } @else {
+
+        <div class="alert alert-success">
+          Receta terminada
+        </div>
+
+      }
+
+    }
+
+  }
+
+  @if (modalCocinandoAbierto) {
+
+    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center"
+        style="z-index: 1050;">
+
+      <div
+        class="card shadow-lg w-100 mx-3 position-relative"
+        style="max-width: 620px; max-height: 90vh; overflow-y: auto;">
+
+        <div class="card-header bg-primary text-white">
+
+          <div class="fw-bold">
+            Cocinando... {{ receta.nombre }}
+          </div>
+
+          <div class="small">
+            Paso {{ mostrandoIngredientes ? 1 : numeroPasoVisible }}:
+            {{ nombrePasoVisible }}
+          </div>
+
+        </div>
+
+        <div class="card-body text-start">
+
+          @if (mostrandoIngredientes) {
+
+            <div class="alert alert-info">
+              Prepara todos los ingredientes con su peso y marca cada uno cuando esté listo.
+            </div>
+
+            <div class="d-flex flex-column gap-2">
+
+              @for (ingrediente of pesosCalculados; track ingrediente.nombre) {
+
+                <label class="border rounded p-2 d-flex justify-content-between align-items-center">
+
+                  <div>
+                    <div >
+                      {{ ingrediente.nombre }}
+                    </div>
+
+                    <div class="small text-muted">
+                      {{ ingrediente.peso | number:'1.0-1' }} g
+                    </div>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    [(ngModel)]="ingredientesPreparados[ingrediente.nombre]">
+
+                </label>
+
+              }
+
+            </div>
+
+          } @else if (pasoActual) {
+
+            <div class="mb-3">
+              <div class="fw-semibold mb-1">
+                Información del paso
+              </div>
+
+              <div class="border rounded p-3 bg-light">
+                {{ pasoActual.descripcion || pasoActual.nombre }}
+              </div>
+            </div>
+
+            @if (hayCronometro) {
+              <div class="border rounded p-3 mb-3">
+
+                <div class="fw-semibold mb-2">
+                  Cronómetro
+                </div>
+
+                <div class="mb-2">
+                  Duración:
+                  <strong>{{ pasoActual.duracion }} min</strong>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-warning w-100"
+                  (click)="iniciarCronometro()">
+                  Iniciar crono
+                </button>
+
+              </div>
+            }
+
+          } @else {
+
+            <div class="alert alert-success">
+              Receta terminada
+            </div>
+
+          }
+
+        </div>
+
+        <div class="card-footer d-flex gap-2">
+
+          <button
+            type="button"
+            class="btn btn-outline-secondary w-100"
+            [disabled]="mostrandoIngredientes"
+            (click)="pasoAnterior()">
+            Anterior paso
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-primary w-100"
+            [disabled]="mostrandoIngredientes && !todosIngredientesPreparados"
+            (click)="siguientePaso()">
+            Siguiente paso
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-outline-danger w-100"
+            (click)="cerrarCocinado()">
+            Cancelar
+          </button>
+
+        </div>
+
+        @if (cronometroActivo) {
+          <div
+            class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center"
+            style="z-index: 1060;">
+
+            <div class="card shadow-lg text-center p-4" style="min-width: 280px;">
+
+              <div class="fw-bold fs-5 mb-3">
+                Cronómetro
+              </div>
+
+              <div class="display-3 fw-bold text-primary mb-3">
+                {{ tiempoCronometro }}
+              </div>
+
+              <div class="text-muted mb-3">
+                {{ pasoActual?.nombre }}
+              </div>
+
+              <button
+                type="button"
+                class="btn btn-outline-danger"
+                (click)="detenerCronometro()">
+                Detener
+              </button>
+
+            </div>
+
+          </div>
+        }
+
+      </div>
+
+    </div>
+
+  }
+
+
+
+
+
+</div>

@@ -1,0 +1,35 @@
+[
+  {
+    "recetaId": 3,
+    "pasos": [
+      {
+        "orden": 1,
+        "nombre": "Autolisis",
+        "duracion": 30,
+        "sonido": "Alerta",
+        "operaciones": []
+      },
+      {
+        "orden": 2,
+        "nombre": "Autolisis (copia)",
+        "duracion": 30,
+        "sonido": "Alerta",
+        "operaciones": []
+      },
+      {
+        "orden": 3,
+        "nombre": "amasado 1",
+        "duracion": 5,
+        "sonido": "Alerta",
+        "operaciones": []
+      },
+      {
+        "orden": 4,
+        "nombre": "reposo 1",
+        "duracion": 5,
+        "sonido": "Alerta",
+        "operaciones": []
+      }
+    ]
+  }
+]

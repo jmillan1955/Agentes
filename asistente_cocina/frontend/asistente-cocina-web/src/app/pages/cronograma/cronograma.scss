@@ -1,0 +1,15 @@
+.cronograma-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.cronograma-modal {
+  width: min(100%, 520px);
+  border-radius: 1rem;
+}

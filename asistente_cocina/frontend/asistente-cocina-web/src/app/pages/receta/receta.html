@@ -1,0 +1,301 @@
+<!-- pages/receta/receta.html -->
+
+<main class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+
+    <button
+      type="button"
+      class="btn btn-link text-decoration-none p-0"
+      (click)="volverAtras()">
+      ← Volver
+    </button>
+
+    <h1 class="fs-5 fw-bold text-primary m-0 text-center">
+      {{ receta.nombre }}
+    </h1>
+
+    <span style="width: 60px;"></span>
+
+  </div>
+
+  @if (error) {
+    <div class="alert alert-danger">
+      {{ error }}
+    </div>
+  }
+
+  <section class="mx-auto" style="max-width: 620px;">
+
+    <div class="card shadow-sm mb-2">
+
+      <div class="card-header bg-light">
+        <div class="fw-semibold text-primary">
+          {{ receta.nombre }}
+        </div>
+
+        <div class="small text-muted">
+          {{ receta.categoria }} · {{ receta.pesoRacion || 0 }} g/ración
+        </div>
+      </div>
+
+      <div class="card-body p-2">
+
+        <!-- INGREDIENTES -->
+        <button
+          type="button"
+          class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center mb-2"
+          (click)="toggleIngredientes()">
+
+          <span class="fw-semibold">
+            Ingredientes
+          </span>
+
+          <span>
+            {{ panelIngredientesAbierto ? '▲' : '▼' }}
+          </span>
+
+        </button>
+
+        @if (panelIngredientesAbierto) {
+          <div class="border rounded p-2 mb-2">
+
+            @if (ingredientes.length > 0) {
+              <div class="d-flex flex-column gap-2 mb-3">
+
+              @for (ingrediente of ingredientes; track ingrediente.nombre) {
+
+                <div class="d-flex justify-content-between align-items-center border rounded p-2">
+
+                  <div>
+                    <span>{{ ingrediente.nombre }}</span>
+
+                    <strong class="ms-2">
+                      {{ ingrediente.cantidad }} {{ ingrediente.unidad }}
+                    </strong>
+                  </div>
+
+                  <div class="d-flex gap-2">
+
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      (click)="editarIngrediente(ingrediente)">
+                      ✏️
+                    </button>
+
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      (click)="eliminarIngrediente(ingrediente)">
+                      🗑️
+                    </button>
+
+                  </div>
+
+                </div>
+
+              }
+
+              </div>
+            } @else {
+              <div class="alert alert-warning">
+                No hay ingredientes
+              </div>
+            }
+
+            <form
+              class="border rounded p-2 bg-light d-flex flex-column gap-2"
+              (ngSubmit)="guardarIngrediente()">
+
+              <div class="fw-semibold">
+                Nuevo ingrediente
+              </div>
+
+              <div class="d-flex gap-2">
+                <input
+                  type="number"
+                  step="0.1"
+                  class="form-control"
+                  placeholder="Cantidad"
+                  name="nuevoIngredienteCantidad"
+                  [(ngModel)]="nuevoIngredienteCantidad"
+                  required>
+
+                <select
+                  class="form-select"
+                  name="nuevoIngredienteUnidad"
+                  [(ngModel)]="nuevoIngredienteUnidad">
+                  <option value="%">%</option>
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="uds">uds</option>
+                </select>
+              </div>
+
+              <input
+                type="text"
+                class="form-control"
+                placeholder="Nombre ingrediente"
+                name="nuevoIngredienteNombre"
+                [(ngModel)]="nuevoIngredienteNombre"
+                required>
+
+              <button
+                type="submit"
+                class="btn btn-success w-100">
+                {{ ingredienteEditando ? 'Guardar ingrediente' : 'Añadir ingrediente' }}
+              </button>
+
+              @if (ingredienteEditando) {
+                <button
+                  type="button"
+                  class="btn btn-secondary w-100"
+                  (click)="cancelarEdicionIngrediente()">
+                  Cancelar
+                </button>
+              }
+
+            </form>
+
+          </div>
+        }
+
+        <!-- PASOS -->
+        <button
+          type="button"
+          class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center mb-2"
+          (click)="togglePasos()">
+
+          <span class="fw-semibold">
+            Pasos cronograma
+          </span>
+
+          <span>
+            {{ panelPasosAbierto ? '▲' : '▼' }}
+          </span>
+
+        </button>
+
+        @if (panelPasosAbierto) {
+          <div class="border rounded p-2">
+
+            @if (pasos.length > 0) {
+              <div class="d-flex flex-column gap-2 mb-3">
+
+              @for (paso of pasos; track paso.orden) {
+                <div class="d-flex justify-content-between align-items-center border rounded p-2">
+
+                  <div>
+                    <div class="fw-semibold">
+                      {{ paso.orden }}. {{ paso.nombre }}
+                    </div>
+
+                    @if (paso.duracion && paso.duracion > 0) {
+                      <div class="small text-muted">
+                        Cronómetro: {{ paso.duracion }} min
+                      </div>
+                    } @else {
+                      <div class="small text-muted">
+                        Sin cronómetro
+                      </div>
+}
+                  </div>
+
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      (click)="editarPaso(paso)">
+                      ✏️
+                    </button>
+
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      (click)="eliminarPaso(paso)">
+                      🗑️
+                    </button>
+                  </div>
+
+                </div>
+              }
+
+              </div>
+            } @else {
+              <div class="alert alert-warning">
+                No hay pasos configurados
+              </div>
+            }
+
+            <form
+              class="border rounded p-2 bg-light d-flex flex-column gap-2"
+              (ngSubmit)="guardarPaso()">
+
+              <div class="fw-semibold">
+                {{ pasoEditando ? 'Editar paso' : 'Nuevo paso' }}
+              </div>
+
+              <textarea
+                class="form-control"
+                rows="4"
+                placeholder="Descripción del paso"
+                name="nuevoPasoNombre"
+                [(ngModel)]="nuevoPasoNombre"
+                required>
+              </textarea>
+
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="nuevoPasoCronometro"
+                  name="nuevoPasoCronometro"
+                  [(ngModel)]="nuevoPasoCronometro">
+
+                <label
+                  class="form-check-label"
+                  for="nuevoPasoCronometro">
+                  Cronómetro
+                </label>
+              </div>
+
+              @if (nuevoPasoCronometro) {
+                <input
+                  type="number"
+                  class="form-control"
+                  placeholder="Duración minutos"
+                  name="nuevoPasoDuracion"
+                  [(ngModel)]="nuevoPasoDuracion"
+                  min="1">
+              }
+
+              <div class="d-flex gap-2">
+                <button
+                  type="submit"
+                  class="btn btn-success w-100">
+                  {{ pasoEditando ? 'Guardar paso' : 'Añadir paso' }}
+                </button>
+
+                @if (pasoEditando) {
+                  <button
+                    type="button"
+                    class="btn btn-secondary w-100"
+                    (click)="cancelarEdicionPaso()">
+                    Cancelar
+                  </button>
+                }
+              </div>
+
+            </form>
+
+          </div>
+        }
+
+      </div>
+
+    </div>
+
+  </section>
+
+</main> 

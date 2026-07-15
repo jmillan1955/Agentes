@@ -1,0 +1,8 @@
+{
+  "/api": {
+    "target": "https://recetas.jmn55.duckdns.org",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

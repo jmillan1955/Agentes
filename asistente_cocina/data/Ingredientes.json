@@ -1,0 +1,61 @@
+[
+  { "recetaId": 1, "cantidad": 100, "unidad": "%", "nombre": "calabaza" },
+  { "recetaId": 1, "cantidad": 50, "unidad": "%", "nombre": "patata" },
+  { "recetaId": 1, "cantidad": 30, "unidad": "%", "nombre": "cebolla" },
+  { "recetaId": 1, "cantidad": 20, "unidad": "%", "nombre": "zanahoria" },
+  { "recetaId": 1, "cantidad": 10, "unidad": "%", "nombre": "aceite de oliva" },
+  { "recetaId": 1, "cantidad": 500, "unidad": "%", "nombre": "caldo de verduras" },
+
+  { "recetaId": 2, "cantidad": 100, "unidad": "%", "nombre": "harina" },
+
+  { "recetaId": 3, "cantidad": 100, "unidad": "%", "nombre": "harina" },
+  { "recetaId": 3, "cantidad": 30, "unidad": "%", "nombre": "masa madre" },
+  { "recetaId": 3, "cantidad": 70, "unidad": "%", "nombre": "agua" },
+  { "recetaId": 3, "cantidad": 2, "unidad": "%", "nombre": "sal" },
+
+  { "recetaId": 4, "cantidad": 100, "unidad": "%", "nombre": "harina integral" },
+  { "recetaId": 4, "cantidad": 30, "unidad": "%", "nombre": "masa madre" },
+  { "recetaId": 4, "cantidad": 68, "unidad": "%", "nombre": "agua" },
+  { "recetaId": 4, "cantidad": 2, "unidad": "%", "nombre": "sal" },
+
+  { "recetaId": 5, "cantidad": 100, "unidad": "%", "nombre": "harina" },
+  { "recetaId": 5, "cantidad": 62, "unidad": "%", "nombre": "agua" },
+  { "recetaId": 5, "cantidad": 2, "unidad": "%", "nombre": "sal" },
+  { "recetaId": 5, "cantidad": 1, "unidad": "%", "nombre": "aceite oliva virgen extre" },
+
+  { "recetaId": 6, "cantidad": 100, "unidad": "%", "nombre": "Harina" },
+  { "recetaId": 6, "cantidad": 100, "unidad": "%", "nombre": "Masa madre" },
+  { "recetaId": 6, "cantidad": 60, "unidad": "%", "nombre": "Agua" },
+  { "recetaId": 6, "cantidad": 2, "unidad": "%", "nombre": "Sal" },
+  { "recetaId": 6, "cantidad": 8, "unidad": "%", "nombre": "Aceite de oliva" },
+
+  { "recetaId": 7, "cantidad": 100, "unidad": "%", "nombre": "Masa madre" },
+  { "recetaId": 7, "cantidad": 150, "unidad": "%", "nombre": "Harina" },
+  { "recetaId": 7, "cantidad": 80, "unidad": "%", "nombre": "Agua" },
+  { "recetaId": 7, "cantidad": 25, "unidad": "%", "nombre": "Aceite de oliva" },
+  { "recetaId": 7, "cantidad": 4, "unidad": "%", "nombre": "Sal" },
+  { "recetaId": 7, "cantidad": 4, "unidad": "%", "nombre": "Miel" },
+
+  { "recetaId": 8, "cantidad": 100, "unidad": "%", "nombre": "Harina" },
+  { "recetaId": 8, "cantidad": 100, "unidad": "%", "nombre": "Masa madre nevera" },
+  { "recetaId": 8, "cantidad": 100, "unidad": "%", "nombre": "Azucar" },
+  { "recetaId": 8, "cantidad": 50, "unidad": "%", "nombre": "Aceite" },
+  { "recetaId": 8, "cantidad": 50, "unidad": "%", "nombre": "leche" },
+  { "recetaId": 8, "cantidad": 5, "unidad": "%", "nombre": "levadura quimica" },
+  { "recetaId": 8, "cantidad": 1.5, "unidad": "%", "nombre": "Huevos" },
+  { "recetaId": 8, "cantidad": 1, "unidad": "%", "nombre": "Yogour de limón" },
+
+  { "recetaId": 9, "cantidad": 100, "unidad": "%", "nombre": "Arroz" },
+  { "recetaId": 9, "cantidad": 100, "unidad": "%", "nombre": "Azucar" },
+  { "recetaId": 9, "cantidad": 35, "unidad": "%", "nombre": "mantequilla" },
+  { "recetaId": 9, "cantidad": 750, "unidad": "%", "nombre": "leche" },
+  { "recetaId": 9, "cantidad": 0, "unidad": "%", "nombre": "canela" },
+  { "recetaId": 9, "cantidad": 0, "unidad": "%", "nombre": "piel de naranja / limon" },
+
+  { "recetaId": 10, "cantidad": 100, "unidad": "%", "nombre": "Arroz" },
+  { "recetaId": 10, "cantidad": 100, "unidad": "%", "nombre": "Azucar" },
+  { "recetaId": 10, "cantidad": 35, "unidad": "%", "nombre": "mantequilla" },
+  { "recetaId": 10, "cantidad": 750, "unidad": "%", "nombre": "leche" },
+  { "recetaId": 10, "cantidad": 0, "unidad": "%", "nombre": "canela" },
+  { "recetaId": 10, "cantidad": 0, "unidad": "%", "nombre": "piel de naranja / limon" }
+]

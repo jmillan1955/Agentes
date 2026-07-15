@@ -1,0 +1,130 @@
+<div class="container py-4">
+
+  <div class="row justify-content-center">
+
+    <div class="col-12 col-lg-8">
+
+      <h1 class="mb-4">
+        {{ receta.nombre }}
+      </h1>
+
+      <div class="card shadow-sm">
+
+        <div class="card-header bg-primary text-white">
+          <h2 class="h5 mb-0">
+            Paso {{ pasoActual.numpaso }}
+          </h2>
+        </div>
+
+        <div class="card-body">
+
+          <p class="lead mb-0">
+            {{ pasoActual.mensaje }}
+          </p>
+
+          @if (pasoActual.numpaso === 1) {
+
+            <div class="mt-4">
+
+              <h3 class="h5 mb-3">
+                Ingredientes
+              </h3>
+
+              <ul class="list-group">
+                @for (ingrediente of receta.ingredientes; track ingrediente) {
+                  <li class="list-group-item">
+                    {{ ingrediente }}
+                  </li>
+                }
+              </ul>
+
+            </div>
+          }
+
+        </div>
+
+        <div class="card-footer bg-white">
+
+          <div class="d-flex flex-wrap gap-2 justify-content-between">
+
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              (click)="anterior()"
+              [disabled]="indicePasoActual === 0">
+              Anterior
+            </button>
+
+            <div class="d-flex flex-wrap gap-2">
+
+              @if (pasoActual.cronometro && !cronometroActivo) {
+
+                <button
+                  type="button"
+                  class="btn btn-success"
+                  (click)="iniciarCronometro()">
+                  Iniciar
+                </button>
+              }
+
+              @if (cronometroActivo) {
+
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  (click)="pararCronometro()">
+                  Parar
+                </button>
+              }
+
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="siguiente()"
+                [disabled]="indicePasoActual === receta.pasos.length - 1">
+                Siguiente
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  @if (cronometroActivo) {
+
+    <div class="cronograma-overlay">
+
+      <div class="card shadow-lg cronograma-modal">
+
+        <div class="card-body text-center p-5">
+
+          <h2 class="h4 mb-3">
+            Cocinando...
+          </h2>
+
+          <div class="display-1 fw-bold text-warning mb-4">
+            {{ formatearTiempo(segundosRestantes) }}
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-danger btn-lg"
+            (click)="pararCronometro()">
+            Parar
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  }
+
+</div>

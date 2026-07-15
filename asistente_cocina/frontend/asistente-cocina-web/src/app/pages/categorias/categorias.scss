@@ -1,0 +1,14 @@
+/* pages/categorias/categorias.scss */
+
+:host {
+  display: block;
+}
+
+.card-header.btn {
+  border: 0;
+  border-radius: var(--bs-card-inner-border-radius) var(--bs-card-inner-border-radius) 0 0;
+}
+
+.list-group-item {
+  cursor: pointer;
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "nombre": "Crema de calabaza",
+    "categoria": "Cremas / Purés",
+    "pesoRacion": 100
+  },
+  {
+    "id": 2,
+    "nombre": "pan",
+    "categoria": "Pan",
+    "pesoRacion": 100
+  },
+  {
+    "id": 3,
+    "nombre": "pan Anabel",
+    "categoria": "Pan",
+    "pesoRacion": 100
+  },
+  {
+    "id": 4,
+    "nombre": "pan INTEGRAL",
+    "categoria": "Pan",
+    "pesoRacion": 100
+  },
+  {
+    "id": 5,
+    "nombre": "pizza",
+    "categoria": "Pan",
+    "pesoRacion": 100
+  },
+  {
+    "id": 6,
+    "nombre": "Pizza mm nevera",
+    "categoria": "Pan",
+    "pesoRacion": 100
+  },
+  {
+    "id": 7,
+    "nombre": "Torta de aceite",
+    "categoria": "Pan",
+    "pesoRacion": 100
+  },
+  {
+    "id": 8,
+    "nombre": "Bizcocho masa madre nevera",
+    "categoria": "Bizcochos",
+    "pesoRacion": 100
+  },
+  {
+    "id": 9,
+    "nombre": "Arroz con leche Thermomix",
+    "categoria": "Postres",
+    "pesoRacion": 100
+  },
+  {
+    "id": 10,
+    "nombre": "Arroz con leche Thermomix",
+    "categoria": "Arroces",
+    "pesoRacion": 100
+  },
+  {
+    "id": 11,
+    "nombre": "cocido madrileño",
+    "categoria": "Platos cuchara",
+    "pesoRacion": 100
+  },
+  {
+    "id": 12,
+    "nombre": "lentejas",
+    "categoria": "Platos cuchara",
+    "pesoRacion": 100
+  }
+]
