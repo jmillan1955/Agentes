@@ -17,6 +17,25 @@ Primera fase completada:
 - Acceso restringido al usuario autorizado.
 - Registros configurados para no mostrar el token.
 
+- Recepción de notas de voz.
+- Descarga temporal de audio OGG/Opus.
+- Lectura de duración y tamaño.
+- Eliminación automática del archivo temporal.
+
+- Transcripción local de notas de voz con `faster-whisper`.
+- Modelo Whisper `small`.
+- Ejecución por CPU con cuantización `int8`.
+- Idioma de transcripción configurado en español.
+- Eliminación del audio después de transcribirlo.
+
+## Próxima fase
+
+## Próxima fase
+
+- Enviar el texto transcrito a Ollama.
+- Utilizar el texto como prompt para el modelo local.
+- Devolver por Telegram la respuesta del modelo.
+
 ## Estructura
 
 ```text
