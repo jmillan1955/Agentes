@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import tempfile
 from pathlib import Path
@@ -273,13 +274,67 @@ class TelegramChannel:
             peticion,
         )
 
-        await self._enviar_texto(
-            update,
-            respuesta.contenido,
+
+
+
+        texto_salida = self._formatear_respuesta(
+            respuesta.contenido
         )
 
+        await self._enviar_texto(
+            update=update,
+            texto=texto_salida,
+        )
+
+
     @staticmethod
+
+    @staticmethod
+    def _formatear_respuesta(
+        contenido: str,
+    ) -> str:
+        """
+        Convierte la respuesta JSON interna en un mensaje
+        legible para Telegram.
+        """
+        try:
+            datos = json.loads(contenido)
+        except (json.JSONDecodeError, TypeError):
+            return contenido
+
+        respuesta = datos.get("respuesta")
+
+        if not isinstance(respuesta, str):
+            return contenido
+
+        # Convierte posibles secuencias literales \n
+        # en saltos de línea reales.
+        respuesta = respuesta.replace(
+            "\\n",
+            "\n",
+        ).strip()
+
+        tiempo = datos.get(
+            "tiempo_ejecución_segundos"
+        )
+
+        if tiempo is None:
+            tiempo = datos.get(
+                "tiempo_ejecucion_segundos"
+            )
+
+        if isinstance(tiempo, (int, float)):
+            return (
+                f"{respuesta}\n\n"
+                f"⏱ Tiempo de ejecución: "
+                f"{tiempo:.3f} segundos"
+            )
+
+        return respuesta
+
+
     async def _enviar_texto(
+        self,
         update: Update,
         texto: str,
     ) -> None:
