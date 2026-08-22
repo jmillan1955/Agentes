@@ -3,3 +3,7 @@ httpx
 pytest
 python-dotenv
 python-telegram-bot
+kokoro>=0.9.4,<1
+soundfile>=0.13,<1
+numpy>=1.26,<3
+imageio-ffmpeg>=0.6,<1

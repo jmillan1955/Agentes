@@ -18,7 +18,10 @@ from telegram.ext import (
 from app.models import Peticion, TipoEntrada
 from app.orchestrator import Orchestrator
 from app.transcription_service import TranscriptionService
-
+from app.text_to_speech_service import (
+    TextToSpeechError,
+    TextToSpeechService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +33,15 @@ class TelegramChannel:
         allowed_user_id: int,
         orchestrator: Orchestrator,
         transcription_service: TranscriptionService,
+        text_to_speech_service: TextToSpeechService,
     ) -> None:
         self.token = token
         self.allowed_user_id = allowed_user_id
         self.orchestrator = orchestrator
         self.transcription_service = transcription_service
+        self.text_to_speech_service = (
+            text_to_speech_service
+        )
 
     def ejecutar(self) -> None:
         application = (
@@ -53,6 +60,12 @@ class TelegramChannel:
             MessageHandler(
                 filters.VOICE,
                 self.recibir_voz,
+            )
+        )
+        application.add_handler(
+            MessageHandler(
+                filters.Document.ALL,
+                self.recibir_documento,
             )
         )
         application.add_handler(
@@ -105,7 +118,10 @@ class TelegramChannel:
         await update.message.reply_text(
             "Hola, José.\n\n"
             "El Agente IA está conectado.\n"
-            "Puedes enviarme texto o una nota de voz."
+            "Puedes enviarme:\n"
+            "- Un mensaje de texto.\n"
+            "- Una nota de voz.\n"
+            "- Un fichero TXT para convertirlo en MP3."
         )
 
     async def mostrar_id(
@@ -257,6 +273,171 @@ class TelegramChannel:
         finally:
             ruta_audio.unlink(missing_ok=True)
 
+
+    async def recibir_documento(
+    self,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        if not self.usuario_autorizado(update):
+            return
+
+        if (
+            update.message is None
+            or update.message.document is None
+        ):
+            return
+
+        documento = update.message.document
+        nombre_original = (
+            documento.file_name or "texto.txt"
+        )
+        nombre_seguro = Path(nombre_original).name
+
+        if Path(nombre_seguro).suffix.lower() != ".txt":
+            await update.message.reply_text(
+                "Por ahora solamente puedo convertir "
+                "ficheros con extensión .txt."
+            )
+            return
+
+        limite_bytes = 1_000_000
+
+        if (
+            documento.file_size is not None
+            and documento.file_size > limite_bytes
+        ):
+            await update.message.reply_text(
+                "El fichero es demasiado grande. "
+                "El límite actual es de 1 MB."
+            )
+            return
+
+        await update.message.reply_text(
+            f"Fichero recibido: {nombre_seguro}\n"
+            "Preparando la conversión a MP3..."
+        )
+
+        try:
+            with tempfile.TemporaryDirectory(
+                prefix="agente_ia_telegram_tts_"
+            ) as carpeta_temporal:
+                carpeta = Path(carpeta_temporal)
+
+                ruta_texto = (
+                    carpeta
+                    / f"{documento.file_unique_id}.txt"
+                )
+
+                nombre_base = (
+                    Path(nombre_seguro).stem.strip()
+                    or "audio"
+                )
+
+                ruta_mp3 = (
+                    carpeta / f"{nombre_base}.mp3"
+                )
+
+                archivo_telegram = (
+                    await context.bot.get_file(
+                        documento.file_id
+                    )
+                )
+
+                await archivo_telegram.download_to_drive(
+                    custom_path=ruta_texto
+                )
+
+                try:
+                    texto = ruta_texto.read_text(
+                        encoding="utf-8-sig"
+                    ).strip()
+                except UnicodeDecodeError:
+                    await update.message.reply_text(
+                        "No he podido leer el fichero. "
+                        "Debe estar guardado en formato UTF-8."
+                    )
+                    return
+
+                if not texto:
+                    await update.message.reply_text(
+                        "El fichero de texto está vacío."
+                    )
+                    return
+
+                if (
+                    len(texto)
+                    > self.text_to_speech_service.max_characters
+                ):
+                    await update.message.reply_text(
+                        "El texto contiene "
+                        f"{len(texto)} caracteres y supera "
+                        "el límite de "
+                        f"{self.text_to_speech_service.max_characters}."
+                    )
+                    return
+
+                await update.message.reply_text(
+                    f"Texto leído: {len(texto)} caracteres.\n"
+                    "Generando el audio con Kokoro..."
+                )
+
+                inicio = asyncio.get_running_loop().time()
+
+                await asyncio.to_thread(
+                    self.text_to_speech_service.generar_mp3,
+                    texto,
+                    ruta_mp3,
+                )
+
+                tiempo = (
+                    asyncio.get_running_loop().time()
+                    - inicio
+                )
+
+                logger.info(
+                    "MP3 generado: caracteres=%s, "
+                    "voz=%s, tiempo=%.3f segundos",
+                    len(texto),
+                    self.text_to_speech_service.voice,
+                    tiempo,
+                )
+
+                with ruta_mp3.open("rb") as archivo_mp3:
+                    await update.message.reply_document(
+                        document=archivo_mp3,
+                        filename=ruta_mp3.name,
+                        caption=(
+                            "Audio generado con Kokoro.\n"
+                            f"Voz: "
+                            f"{self.text_to_speech_service.voice}\n"
+                            f"Tiempo de ejecución: "
+                            f"{tiempo:.3f} segundos"
+                        ),
+                    )
+
+        except TextToSpeechError as error:
+            logger.warning(
+                "Error controlado al generar el MP3: %s",
+                error,
+            )
+
+            await update.message.reply_text(
+                f"No se ha podido generar el audio.\n\n"
+                f"{error}"
+            )
+
+        except Exception:
+            logger.exception(
+                "No se pudo procesar el fichero de texto"
+            )
+
+            await update.message.reply_text(
+                "No se ha podido procesar "
+                "el fichero de texto."
+            )
+
+
     async def _procesar_peticion(
         self,
         update: Update,
@@ -286,8 +467,6 @@ class TelegramChannel:
             texto=texto_salida,
         )
 
-
-    @staticmethod
 
     @staticmethod
     def _formatear_respuesta(

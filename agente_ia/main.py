@@ -4,6 +4,9 @@ import argparse
 import logging
 
 from app.orchestrator import Orchestrator
+from app.text_to_speech_service import (
+    TextToSpeechService,
+)
 from app.transcription_service import (
     TranscriptionService,
 )
@@ -92,10 +95,14 @@ def main() -> None:
             "Falta TELEGRAM_ALLOWED_USER_ID en .env"
         )
 
-    transcription_service = (
-        TranscriptionService(
-            model_name=settings.whisper_model,
-        )
+    transcription_service = TranscriptionService(
+        model_name=settings.whisper_model,
+    )
+
+    text_to_speech_service = TextToSpeechService(
+        voice=settings.kokoro_voice,
+        speed=settings.kokoro_speed,
+        max_characters=settings.tts_max_characters,
     )
 
     canal = TelegramChannel(
@@ -106,6 +113,9 @@ def main() -> None:
         orchestrator=orchestrator,
         transcription_service=(
             transcription_service
+        ),
+        text_to_speech_service=(
+            text_to_speech_service
         ),
     )
 

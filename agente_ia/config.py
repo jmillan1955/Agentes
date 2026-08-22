@@ -27,6 +27,12 @@ class Settings:
     telegram_allowed_user_id: int | None
 
     whisper_model: str
+
+    tts_provider: str
+    kokoro_voice: str
+    kokoro_speed: float
+    tts_max_characters: int
+
     docs_dir: Path
 
     @classmethod
@@ -62,6 +68,68 @@ class Settings:
                 "'consola' o 'telegram'"
             )
 
+        tts_provider = os.getenv(
+            "TTS_PROVIDER",
+            "kokoro",
+        ).lower()
+
+        if tts_provider != "kokoro":
+            raise RuntimeError(
+                "TTS_PROVIDER debe ser 'kokoro'"
+            )
+
+        kokoro_voice = os.getenv(
+            "KOKORO_VOICE",
+            "ef_dora",
+        )
+
+        if kokoro_voice not in {
+            "ef_dora",
+            "em_alex",
+            "em_santa",
+        }:
+            raise RuntimeError(
+                "KOKORO_VOICE debe ser "
+                "'ef_dora', 'em_alex' o 'em_santa'"
+            )
+
+        try:
+            kokoro_speed = float(
+                os.getenv(
+                    "KOKORO_SPEED",
+                    "1.0",
+                )
+            )
+        except ValueError as error:
+            raise RuntimeError(
+                "KOKORO_SPEED debe ser un número"
+            ) from error
+
+        if not 0.5 <= kokoro_speed <= 2.0:
+            raise RuntimeError(
+                "KOKORO_SPEED debe estar "
+                "entre 0.5 y 2.0"
+            )
+
+        try:
+            tts_max_characters = int(
+                os.getenv(
+                    "TTS_MAX_CHARACTERS",
+                    "20000",
+                )
+            )
+        except ValueError as error:
+            raise RuntimeError(
+                "TTS_MAX_CHARACTERS debe "
+                "ser un número entero"
+            ) from error
+
+        if tts_max_characters <= 0:
+            raise RuntimeError(
+                "TTS_MAX_CHARACTERS debe "
+                "ser mayor que cero"
+            )
+
         return cls(
             nombre=os.getenv(
                 "AGENTE_NOMBRE",
@@ -69,7 +137,7 @@ class Settings:
             ),
             version=os.getenv(
                 "AGENTE_VERSION",
-                "0.3.0",
+                "0.4.0",
             ),
             entorno=os.getenv(
                 "AGENTE_ENTORNO",
@@ -95,6 +163,12 @@ class Settings:
             whisper_model=os.getenv(
                 "WHISPER_MODEL",
                 "small",
+            ),
+            tts_provider=tts_provider,
+            kokoro_voice=kokoro_voice,
+            kokoro_speed=kokoro_speed,
+            tts_max_characters=(
+                tts_max_characters
             ),
             docs_dir=BASE_DIR / "docs",
         )
