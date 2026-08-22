@@ -7,7 +7,6 @@ from app.text_to_speech_service import (
     TextToSpeechService,
 )
 
-
 def test_genera_fichero_mp3(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -23,8 +22,10 @@ def test_genera_fichero_mp3(
     def generar_simulado(
         texto: str,
         salida: Path,
+        voice: str,
     ) -> None:
         assert texto == "Texto de prueba"
+        assert voice == "ef_dora"
         salida.write_bytes(b"mp3-simulado")
 
     monkeypatch.setattr(
@@ -41,7 +42,6 @@ def test_genera_fichero_mp3(
     assert resultado == salida.resolve()
     assert resultado.is_file()
     assert resultado.read_bytes() == b"mp3-simulado"
-
 
 def test_rechaza_texto_vacio(
     tmp_path: Path,
@@ -102,6 +102,36 @@ def test_rechaza_voz_desconocida() -> None:
             voice="voz_inexistente"
         )
 
+def test_permite_seleccionar_voz_por_conversion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    servicio = TextToSpeechService(
+        voice="ef_dora"
+    )
+    salida = tmp_path / "alex.mp3"
+
+    def generar_simulado(
+        texto: str,
+        salida: Path,
+        voice: str,
+    ) -> None:
+        assert voice == "em_alex"
+        salida.write_bytes(b"mp3-alex")
+
+    monkeypatch.setattr(
+        servicio,
+        "_generar_audio",
+        generar_simulado,
+    )
+
+    servicio.generar_mp3(
+        texto="Prueba con Alex",
+        salida=salida,
+        voice="em_alex",
+    )
+
+    assert salida.is_file()
 
 @pytest.mark.parametrize(
     "velocidad",

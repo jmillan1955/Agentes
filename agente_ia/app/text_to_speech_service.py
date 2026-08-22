@@ -17,6 +17,7 @@ class TextToSpeechError(RuntimeError):
 
 class TextToSpeechService:
     FRECUENCIA_MUESTREO = 24_000
+
     VOCES_ESPANOLAS = {
         "ef_dora",
         "em_alex",
@@ -55,8 +56,15 @@ class TextToSpeechService:
         self,
         texto: str,
         salida: Path,
+        voice: str | None = None,
     ) -> Path:
         texto = texto.strip()
+        voz = voice or self.voice
+
+        if voz not in self.VOCES_ESPANOLAS:
+            raise TextToSpeechError(
+                f"Voz Kokoro no válida: {voz}"
+            )
 
         if not texto:
             raise TextToSpeechError(
@@ -86,6 +94,7 @@ class TextToSpeechService:
                 self._generar_audio(
                     texto=texto,
                     salida=salida,
+                    voice=voz,
                 )
         except TextToSpeechError:
             raise
@@ -134,6 +143,7 @@ class TextToSpeechService:
         self,
         texto: str,
         salida: Path,
+        voice: str,
     ) -> None:
         try:
             import imageio_ffmpeg
@@ -149,7 +159,7 @@ class TextToSpeechService:
 
         for _, _, audio in pipeline(
             texto,
-            voice=self.voice,
+            voice=voice,
             speed=self.speed,
             split_pattern=r"\n+",
         ):

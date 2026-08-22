@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 import json
 
 from channels.telegram_channel import TelegramChannel
@@ -36,3 +37,36 @@ def test_conserva_respuesta_no_json():
     )
 
     assert resultado == contenido
+
+def test_obtiene_voz_desde_caption() -> None:
+    canal = TelegramChannel.__new__(
+        TelegramChannel
+    )
+    canal.text_to_speech_service = (
+        SimpleNamespace(
+            voice="ef_dora"
+        )
+    )
+
+    voz = canal._obtener_voz_documento(
+        "voz = em_alex"
+    )
+
+    assert voz == "em_alex"
+
+
+def test_utiliza_voz_predeterminada_sin_caption() -> None:
+    canal = TelegramChannel.__new__(
+        TelegramChannel
+    )
+    canal.text_to_speech_service = (
+        SimpleNamespace(
+            voice="ef_dora"
+        )
+    )
+
+    voz = canal._obtener_voz_documento(
+        None
+    )
+
+    assert voz == "ef_dora"

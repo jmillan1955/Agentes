@@ -274,6 +274,25 @@ class TelegramChannel:
             ruta_audio.unlink(missing_ok=True)
 
 
+    def _obtener_voz_documento(
+        self,
+        caption: str | None,
+    ) -> str:
+        if not caption:
+            return self.text_to_speech_service.voice
+
+        for linea in caption.splitlines():
+            clave, separador, valor = linea.partition("=")
+
+            if (
+                separador
+                and clave.strip().lower() == "voz"
+            ):
+                return valor.strip().lower()
+
+        return self.text_to_speech_service.voice
+
+
     async def recibir_documento(
     self,
     update: Update,
@@ -293,6 +312,31 @@ class TelegramChannel:
             documento.file_name or "texto.txt"
         )
         nombre_seguro = Path(nombre_original).name
+
+        voz_seleccionada = (
+            self._obtener_voz_documento(
+                update.message.caption
+            )
+        )
+
+        if (
+            voz_seleccionada
+            not in self.text_to_speech_service.VOCES_ESPANOLAS
+        ):
+            voces = ", ".join(
+                sorted(
+                    self.text_to_speech_service.VOCES_ESPANOLAS
+                )
+            )
+
+            await update.message.reply_text(
+                f"La voz '{voz_seleccionada}' "
+                "no está disponible.\n\n"
+                f"Voces disponibles: {voces}"
+            )
+            return
+
+
 
         if Path(nombre_seguro).suffix.lower() != ".txt":
             await update.message.reply_text(
@@ -388,6 +432,7 @@ class TelegramChannel:
                     self.text_to_speech_service.generar_mp3,
                     texto,
                     ruta_mp3,
+                    voice=voz_seleccionada,
                 )
 
                 tiempo = (
@@ -399,7 +444,7 @@ class TelegramChannel:
                     "MP3 generado: caracteres=%s, "
                     "voz=%s, tiempo=%.3f segundos",
                     len(texto),
-                    self.text_to_speech_service.voice,
+                    voz_seleccionada,
                     tiempo,
                 )
 
@@ -410,7 +455,7 @@ class TelegramChannel:
                         caption=(
                             "Audio generado con Kokoro.\n"
                             f"Voz: "
-                            f"{self.text_to_speech_service.voice}\n"
+                            f"{voz_seleccionada}\n"
                             f"Tiempo de ejecución: "
                             f"{tiempo:.3f} segundos"
                         ),
