@@ -1,0 +1,5 @@
+faster-whisper
+httpx
+pytest
+python-dotenv
+python-telegram-bot

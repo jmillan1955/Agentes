@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="920" viewBox="0 0 1200 920" role="img" aria-labelledby="title desc">
+  <title id="title">Arquitectura propuesta del Agente Cerebro</title>
+  <desc id="desc">Diagrama del flujo desde canales de entrada hasta herramientas y formatos de respuesta.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-opacity="0.15"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#5d6b82"/>
+    </marker>
+    <style>
+      .title{font:700 32px 'Segoe UI',Arial,sans-serif;fill:#172033}
+      .subtitle{font:400 17px 'Segoe UI',Arial,sans-serif;fill:#526075}
+      .box-title{font:700 20px 'Segoe UI',Arial,sans-serif;fill:#172033}
+      .box-text{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#36445a}
+      .small{font:600 14px 'Segoe UI',Arial,sans-serif;fill:#36445a}
+      .line{stroke:#5d6b82;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="920" fill="#f6f8fc"/>
+  <text x="600" y="52" text-anchor="middle" class="title">Arquitectura propuesta — Agente Cerebro</text>
+  <text x="600" y="82" text-anchor="middle" class="subtitle">Recibe la petición, elige una capacidad, comprueba el resultado y responde</text>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="120" width="300" height="120" rx="18" fill="#e8f1ff" stroke="#79a8eb" stroke-width="2"/>
+    <text x="230" y="154" text-anchor="middle" class="box-title">Canales de entrada</text>
+    <text x="230" y="185" text-anchor="middle" class="box-text">Telegram · API FastAPI · Consola</text>
+    <text x="230" y="211" text-anchor="middle" class="box-text">Texto · Voz · Imagen · Fichero</text>
+
+    <rect x="820" y="120" width="300" height="120" rx="18" fill="#e9f8f3" stroke="#68b99d" stroke-width="2"/>
+    <text x="970" y="154" text-anchor="middle" class="box-title">Procesamiento de entrada</text>
+    <text x="970" y="185" text-anchor="middle" class="box-text">Whisper transcribe la voz</text>
+    <text x="970" y="211" text-anchor="middle" class="box-text">Normaliza texto y adjuntos</text>
+
+    <rect x="365" y="300" width="470" height="160" rx="22" fill="#fff1d9" stroke="#e5a93e" stroke-width="3"/>
+    <text x="600" y="341" text-anchor="middle" class="box-title">ORQUESTADOR — AGENTE CEREBRO</text>
+    <text x="600" y="376" text-anchor="middle" class="box-text">Comprende el objetivo y decide la siguiente acción</text>
+    <text x="600" y="404" text-anchor="middle" class="box-text">Combina reglas seguras con Qwen3 4B en Ollama</text>
+    <text x="600" y="432" text-anchor="middle" class="box-text">Valida los parámetros antes de ejecutar</text>
+
+    <rect x="70" y="530" width="250" height="110" rx="18" fill="#f0eaff" stroke="#9d83dc" stroke-width="2"/>
+    <text x="195" y="565" text-anchor="middle" class="box-title">Registro</text>
+    <text x="195" y="595" text-anchor="middle" class="box-text">Herramientas disponibles</text>
+    <text x="195" y="620" text-anchor="middle" class="box-text">Entradas y salidas</text>
+
+    <rect x="365" y="530" width="250" height="110" rx="18" fill="#ffe9e9" stroke="#db7777" stroke-width="2"/>
+    <text x="490" y="565" text-anchor="middle" class="box-title">Seguridad</text>
+    <text x="490" y="595" text-anchor="middle" class="box-text">Permisos y validación</text>
+    <text x="490" y="620" text-anchor="middle" class="box-text">Confirmaciones sensibles</text>
+
+    <rect x="660" y="530" width="470" height="110" rx="18" fill="#eaf4ff" stroke="#669cd6" stroke-width="2"/>
+    <text x="895" y="565" text-anchor="middle" class="box-title">Herramientas y agentes especializados</text>
+    <text x="895" y="595" text-anchor="middle" class="box-text">TTS · Poker · Home Assistant · Familia</text>
+    <text x="895" y="620" text-anchor="middle" class="box-text">Seguridad · Cocina · futuras capacidades</text>
+
+    <rect x="365" y="710" width="470" height="100" rx="18" fill="#e9f8f3" stroke="#68b99d" stroke-width="2"/>
+    <text x="600" y="746" text-anchor="middle" class="box-title">Preparación de la respuesta</text>
+    <text x="600" y="778" text-anchor="middle" class="box-text">Texto · Audio MP3 · JSON · Imagen · Documento</text>
+
+    <rect x="365" y="845" width="470" height="55" rx="18" fill="#172033"/>
+    <text x="600" y="880" text-anchor="middle" style="font:700 19px 'Segoe UI',Arial,sans-serif;fill:#fff">Respuesta al usuario</text>
+  </g>
+
+  <path d="M380 180 H805" class="line"/>
+  <path d="M970 240 V275 H600 V292" class="line"/>
+  <path d="M500 460 V495 H195 V520" class="line"/>
+  <path d="M600 460 V520" class="line"/>
+  <path d="M700 460 V495 H895 V520" class="line"/>
+  <path d="M195 640 V675 H520 V700" class="line"/>
+  <path d="M490 640 V700" class="line"/>
+  <path d="M895 640 V675 H680 V700" class="line"/>
+  <path d="M600 810 V835" class="line"/>
+</svg>
