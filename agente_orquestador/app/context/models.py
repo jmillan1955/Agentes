@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,3 +25,17 @@ class SessionRecord:
     status: str
     started_at: str
     ended_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class MessageRecord:
+    id: int
+    session_id: int
+    message_id: str
+    correlation_id: str | None
+    direction: str
+    channel: str
+    content_type: str
+    text: str | None
+    metadata: dict[str, Any]
+    created_at: str

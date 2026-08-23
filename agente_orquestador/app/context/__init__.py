@@ -1,5 +1,9 @@
 from app.context.database import ContextDatabase
+from app.context.message_repository import (
+    MessageRepository,
+)
 from app.context.models import (
+    MessageRecord,
     ProjectRecord,
     SessionRecord,
 )
@@ -17,6 +21,8 @@ from app.context.session_repository import (
 
 __all__ = [
     "ContextDatabase",
+    "MessageRecord",
+    "MessageRepository",
     "ProjectRecord",
     "ProjectRepository",
     "SCHEMA_VERSION",
