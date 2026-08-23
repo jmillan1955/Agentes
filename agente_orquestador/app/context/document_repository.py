@@ -164,6 +164,27 @@ class DocumentRepository:
             for row in rows
         ]
 
+    def delete(
+    self,
+    project_id: int,
+    relative_path: str,
+    ) -> bool:
+        cursor = self._database.connection.execute(
+            """
+            DELETE FROM documents
+            WHERE project_id = ?
+            AND relative_path = ?
+            """,
+            (
+                project_id,
+                relative_path.strip(),
+            ),
+        )
+
+        self._database.connection.commit()
+
+        return cursor.rowcount > 0
+
     @staticmethod
     def _to_record(
         row: sqlite3.Row | None,

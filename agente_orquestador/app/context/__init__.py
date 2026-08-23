@@ -21,6 +21,10 @@ from app.context.session_repository import (
 from app.context.document_repository import (
     DocumentRepository,
 )
+from app.context.document_synchronizer import (
+    DocumentSynchronizer,
+    DocumentSyncResult,
+)
 
 __all__ = [
     "ContextDatabase",
