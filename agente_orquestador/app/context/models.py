@@ -12,3 +12,15 @@ class ProjectRecord:
     active: bool
     created_at: str
     updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRecord:
+    id: int
+    project_id: int | None
+    channel: str
+    user_id: str
+    conversation_id: str
+    status: str
+    started_at: str
+    ended_at: str | None

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 SCHEMA_SQL = """
@@ -94,6 +94,16 @@ CREATE TABLE IF NOT EXISTS git_commits (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_conversation
 ON sessions(channel, conversation_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS
+idx_sessions_active_unique
+ON sessions(
+    project_id,
+    channel,
+    user_id,
+    conversation_id
+)
+WHERE status = 'active';
 
 CREATE INDEX IF NOT EXISTS idx_messages_session
 ON messages(session_id, created_at);
