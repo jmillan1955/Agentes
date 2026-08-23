@@ -13,6 +13,8 @@ from app.context.models import (
     SessionRecord,
     ContextDocumentMatch,
     ContextSearchResult,
+    ContextMessageMatch,
+    ContextMessageSearchResult,
 )
 from app.context.context_search_service import (
     ContextSearchService,
@@ -71,4 +73,6 @@ __all__ = [
     "ContextDocumentMatch",
     "ContextSearchResult",
     "ContextSearchService",
+    "ContextMessageMatch",
+    "ContextMessageSearchResult",
 ]

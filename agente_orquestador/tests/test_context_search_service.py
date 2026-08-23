@@ -7,8 +7,15 @@ from app.context import (
     ContextSearchService,
     DocumentRepository,
     ProjectRepository,
+    MessageRepository,
+    SessionRepository,
 )
 
+from app.models import (
+    ChannelName,
+    ContentType,
+    IncomingMessage,
+)
 
 def save_document(
     repository: DocumentRepository,
@@ -47,7 +54,12 @@ def create_service(
 
     return (
         project.id,
-        ContextSearchService(repository),
+        ContextSearchService(
+            document_repository=repository,
+            message_repository=MessageRepository(
+                database
+            ),
+        ),        
     )
 
 
@@ -181,3 +193,119 @@ def test_rejects_invalid_limit() -> None:
                 query="Telegram",
                 limit=0,
             )
+
+def test_finds_related_messages() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        project_id, service = create_service(
+            database
+        )
+
+        session = SessionRepository(
+            database
+        ).get_or_create_active(
+            project_id=project_id,
+            channel="telegram",
+            user_id="usuario",
+            conversation_id="conversacion",
+        )
+
+        repository = MessageRepository(
+            database
+        )
+
+        telegram_message = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="usuario",
+            conversation_id="conversacion",
+            content_type=ContentType.TEXT,
+            text=(
+                "Integraremos el canal Telegram "
+                "en el orquestador"
+            ),
+        )
+
+        unrelated_message = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="usuario",
+            conversation_id="conversacion",
+            content_type=ContentType.TEXT,
+            text=(
+                "Mañana prepararemos una "
+                "receta de cocina"
+            ),
+        )
+
+        repository.save_incoming(
+            session.id,
+            telegram_message,
+        )
+        repository.save_incoming(
+            session.id,
+            unrelated_message,
+        )
+
+        result = service.search_messages(
+            project_id=project_id,
+            query="Integración de Telegram",
+        )
+
+        assert len(result.messages) == 1
+        assert (
+            result.messages[0].message_id
+            == telegram_message.message_id
+        )
+        assert (
+            result.messages[0].direction
+            == "incoming"
+        )
+        assert "telegram" in (
+            result.messages[0]
+            .matched_terms
+        )
+
+
+def test_excludes_current_message() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        project_id, service = create_service(
+            database
+        )
+
+        session = SessionRepository(
+            database
+        ).get_or_create_active(
+            project_id=project_id,
+            channel="telegram",
+            user_id="usuario",
+            conversation_id="conversacion",
+        )
+
+        repository = MessageRepository(
+            database
+        )
+
+        current_message = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="usuario",
+            conversation_id="conversacion",
+            content_type=ContentType.TEXT,
+            text="Consulta sobre Telegram",
+        )
+
+        repository.save_incoming(
+            session.id,
+            current_message,
+        )
+
+        result = service.search_messages(
+            project_id=project_id,
+            query="Telegram",
+            exclude_message_id=(
+                current_message.message_id
+            ),
+        )
+
+        assert result.messages == ()

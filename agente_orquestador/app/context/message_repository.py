@@ -113,6 +113,52 @@ class MessageRepository:
             for row in rows
         ]
 
+    def list_by_project(
+            self,
+            project_id: int,
+            limit: int = 100,
+        ) -> list[MessageRecord]:
+            if limit <= 0:
+                raise ValueError(
+                    "limit debe ser mayor que cero"
+                )
+
+            rows = self._database.connection.execute(
+                """
+                SELECT
+                    message.id,
+                    message.session_id,
+                    message.message_id,
+                    message.correlation_id,
+                    message.direction,
+                    message.channel,
+                    message.content_type,
+                    message.text,
+                    message.metadata_json,
+                    message.created_at
+                FROM messages AS message
+                INNER JOIN sessions AS session
+                    ON session.id = message.session_id
+                WHERE session.project_id = ?
+                AND message.text IS NOT NULL
+                AND trim(message.text) <> ''
+                ORDER BY
+                    message.created_at DESC,
+                    message.id DESC
+                LIMIT ?
+                """,
+                (
+                    project_id,
+                    limit,
+                ),
+            ).fetchall()
+
+            return [
+                self._to_record_required(row)
+                for row in rows
+            ]
+
+
     def _save(
         self,
         session_id: int,

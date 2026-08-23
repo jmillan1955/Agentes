@@ -113,3 +113,23 @@ class ContextSearchResult:
         ContextDocumentMatch,
         ...,
     ]
+
+
+@dataclass(frozen=True, slots=True)
+class ContextMessageMatch:
+    message_id: str
+    session_id: int
+    direction: str
+    text: str
+    score: int
+    matched_terms: tuple[str, ...]
+    created_at: str
+
+@dataclass(frozen=True, slots=True)
+class ContextMessageSearchResult:
+    query: str
+    terms: tuple[str, ...]
+    messages: tuple[
+        ContextMessageMatch,
+        ...,
+    ]

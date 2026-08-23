@@ -1,3 +1,4 @@
+import pytest
 from app.context import (
     ContextDatabase,
     MessageRepository,
@@ -204,3 +205,100 @@ def test_recovers_message_by_identifier() -> None:
         assert recovered.message_id == (
             incoming.message_id
         )
+
+def test_lists_messages_by_project() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        projects = ProjectRepository(
+            database
+        )
+
+        project_one = projects.save(
+            name="Proyecto uno",
+            root_path="ruta-uno",
+        )
+
+        project_two = projects.save(
+            name="Proyecto dos",
+            root_path="ruta-dos",
+        )
+
+        sessions = SessionRepository(
+            database
+        )
+
+        session_one = (
+            sessions.get_or_create_active(
+                project_id=project_one.id,
+                channel="telegram",
+                user_id="usuario-1",
+                conversation_id="conversacion-1",
+            )
+        )
+
+        session_two = (
+            sessions.get_or_create_active(
+                project_id=project_two.id,
+                channel="telegram",
+                user_id="usuario-2",
+                conversation_id="conversacion-2",
+            )
+        )
+
+        repository = MessageRepository(
+            database
+        )
+
+        message_one = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="usuario-1",
+            conversation_id="conversacion-1",
+            content_type=ContentType.TEXT,
+            text="Mensaje del proyecto uno",
+        )
+
+        message_two = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="usuario-2",
+            conversation_id="conversacion-2",
+            content_type=ContentType.TEXT,
+            text="Mensaje del proyecto dos",
+        )
+
+        repository.save_incoming(
+            session_one.id,
+            message_one,
+        )
+        repository.save_incoming(
+            session_two.id,
+            message_two,
+        )
+
+        result = repository.list_by_project(
+            project_id=project_one.id
+        )
+
+        assert len(result) == 1
+        assert (
+            result[0].text
+            == "Mensaje del proyecto uno"
+        )
+
+
+def test_rejects_invalid_message_limit() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository = MessageRepository(
+            database
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="limit debe ser mayor que cero",
+        ):
+            repository.list_by_project(
+                project_id=1,
+                limit=0,
+            )
