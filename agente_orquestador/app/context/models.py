@@ -62,3 +62,35 @@ class GitCommitRecord:
     subject: str
     body: str | None
     synchronized_at: str
+
+@dataclass(frozen=True, slots=True)
+class ContextDocumentSummary:
+    relative_path: str
+    title: str | None
+    synchronized_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class ContextCommitSummary:
+    commit_hash: str
+    subject: str
+    authored_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class ContextSummary:
+    project_id: int
+    project_name: str
+    total_sessions: int
+    active_sessions: int
+    total_messages: int
+    total_documents: int
+    total_commits: int
+    recent_documents: tuple[
+        ContextDocumentSummary,
+        ...,
+    ]
+    recent_commits: tuple[
+        ContextCommitSummary,
+        ...,
+    ]

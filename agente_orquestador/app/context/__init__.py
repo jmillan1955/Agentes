@@ -3,6 +3,9 @@ from app.context.message_repository import (
     MessageRepository,
 )
 from app.context.models import (
+    ContextCommitSummary,
+    ContextDocumentSummary,
+    ContextSummary,
     DocumentRecord,
     GitCommitRecord,
     MessageRecord,
@@ -34,7 +37,9 @@ from app.context.git_commit_synchronizer import (
     GitCommitSyncResult,
     GitSynchronizationError,
 )
-
+from app.context.context_query_service import (
+    ContextQueryService,
+)
 
 __all__ = [
     "ContextDatabase",
@@ -53,4 +58,8 @@ __all__ = [
     "GitCommitSynchronizer",
     "GitCommitSyncResult",
     "GitSynchronizationError",
+    "ContextCommitSummary",
+    "ContextDocumentSummary",
+    "ContextQueryService",
+    "ContextSummary",
 ]
