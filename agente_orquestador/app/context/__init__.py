@@ -3,6 +3,7 @@ from app.context.message_repository import (
     MessageRepository,
 )
 from app.context.models import (
+    DocumentRecord,
     MessageRecord,
     ProjectRecord,
     SessionRecord,
@@ -17,7 +18,9 @@ from app.context.schema import (
 from app.context.session_repository import (
     SessionRepository,
 )
-
+from app.context.document_repository import (
+    DocumentRepository,
+)
 
 __all__ = [
     "ContextDatabase",
@@ -29,4 +32,6 @@ __all__ = [
     "SessionRecord",
     "SessionRepository",
     "initialize_schema",
+    "DocumentRecord",
+    "DocumentRepository",
 ]

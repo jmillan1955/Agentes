@@ -39,3 +39,15 @@ class MessageRecord:
     text: str | None
     metadata: dict[str, Any]
     created_at: str
+
+@dataclass(frozen=True, slots=True)
+class DocumentRecord:
+    id: int
+    project_id: int
+    relative_path: str
+    title: str | None
+    content: str
+    content_hash: str
+    file_modified_at: str | None
+    synchronized_at: str
+    git_commit_hash: str | None
