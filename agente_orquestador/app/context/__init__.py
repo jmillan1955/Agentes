@@ -11,7 +11,13 @@ from app.context.models import (
     MessageRecord,
     ProjectRecord,
     SessionRecord,
+    ContextDocumentMatch,
+    ContextSearchResult,
 )
+from app.context.context_search_service import (
+    ContextSearchService,
+)
+
 from app.context.project_repository import (
     ProjectRepository,
 )
@@ -62,4 +68,7 @@ __all__ = [
     "ContextDocumentSummary",
     "ContextQueryService",
     "ContextSummary",
+    "ContextDocumentMatch",
+    "ContextSearchResult",
+    "ContextSearchService",
 ]

@@ -94,3 +94,22 @@ class ContextSummary:
         ContextCommitSummary,
         ...,
     ]
+
+@dataclass(frozen=True, slots=True)
+class ContextDocumentMatch:
+    document_id: int
+    relative_path: str
+    title: str | None
+    score: int
+    matched_terms: tuple[str, ...]
+    excerpt: str
+
+
+@dataclass(frozen=True, slots=True)
+class ContextSearchResult:
+    query: str
+    terms: tuple[str, ...]
+    documents: tuple[
+        ContextDocumentMatch,
+        ...,
+    ]
