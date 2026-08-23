@@ -1,5 +1,10 @@
 from types import SimpleNamespace
-
+from app.context import (
+    ContextDatabase,
+    MessageRepository,
+    ProjectRepository,
+    SessionRepository,
+)
 from app.models import (
     ChannelName,
     ContentType,
@@ -7,15 +12,33 @@ from app.models import (
 from app.orchestrator import Orchestrator
 from app.channels.telegram import TelegramChannel
 
-
 def create_channel() -> TelegramChannel:
+    database = ContextDatabase(
+        ":memory:"
+    ).connect()
+
+    project = ProjectRepository(
+        database
+    ).save(
+        name="Agente Orquestador",
+        root_path="ruta-del-proyecto",
+    )
+
+    orchestrator = Orchestrator(
+        project_id=project.id,
+        session_repository=SessionRepository(
+            database
+        ),
+        message_repository=MessageRepository(
+            database
+        ),
+    )
+
     return TelegramChannel(
         token="token-de-prueba",
         allowed_user_id=123456,
-        orchestrator=Orchestrator(),
+        orchestrator=orchestrator,
     )
-
-
 def test_authorizes_configured_user() -> None:
     channel = create_channel()
 

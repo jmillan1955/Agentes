@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from app.context import (
+    MessageRepository,
+    SessionRepository,
+)
 from app.models import (
     ContentType,
     IncomingMessage,
@@ -8,16 +12,57 @@ from app.models import (
 
 
 class Orchestrator:
-    """
-    Núcleo provisional del agente.
-
-    En esta primera versión solamente confirma que
-    ha recibido correctamente el mensaje.
-    """
+    def __init__(
+        self,
+        project_id: int,
+        session_repository: SessionRepository,
+        message_repository: MessageRepository,
+    ) -> None:
+        self._project_id = project_id
+        self._session_repository = (
+            session_repository
+        )
+        self._message_repository = (
+            message_repository
+        )
 
     def process(
         self,
         message: IncomingMessage,
+    ) -> OutgoingMessage:
+        session = (
+            self._session_repository
+            .get_or_create_active(
+                project_id=self._project_id,
+                channel=message.channel.value,
+                user_id=message.user_id,
+                conversation_id=(
+                    message.conversation_id
+                ),
+            )
+        )
+
+        self._message_repository.save_incoming(
+            session_id=session.id,
+            message=message,
+        )
+
+        outgoing = self._create_response(
+            message=message,
+            session_id=session.id,
+        )
+
+        self._message_repository.save_outgoing(
+            session_id=session.id,
+            message=outgoing,
+        )
+
+        return outgoing
+
+    @staticmethod
+    def _create_response(
+        message: IncomingMessage,
+        session_id: int,
     ) -> OutgoingMessage:
         if message.content_type != ContentType.TEXT:
             response_text = (
@@ -38,6 +83,9 @@ class Orchestrator:
             correlation_id=message.message_id,
             text=response_text,
             metadata={
-                "processor": "provisional_orchestrator",
+                "processor": (
+                    "provisional_orchestrator"
+                ),
+                "session_id": session_id,
             },
         )

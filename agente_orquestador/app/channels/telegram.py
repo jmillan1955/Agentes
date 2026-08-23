@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from telegram import Update
@@ -124,9 +123,8 @@ class TelegramChannel:
                 update
             )
 
-            outgoing = await asyncio.to_thread(
-                self._orchestrator.process,
-                incoming,
+            outgoing = self._orchestrator.process(
+                incoming
             )
 
             await self.send_outgoing(

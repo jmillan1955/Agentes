@@ -9,7 +9,12 @@ from app.context import (
 )
 from app.orchestrator import Orchestrator
 from config import Settings
-
+from app.context import (
+    ContextDatabase,
+    MessageRepository,
+    ProjectRepository,
+    SessionRepository,
+)
 
 logging.basicConfig(
     format=(
@@ -61,7 +66,19 @@ def main() -> None:
             project.name,
         )
 
-        orchestrator = Orchestrator()
+        session_repository = SessionRepository(
+            database
+        )
+
+        message_repository = MessageRepository(
+            database
+        )
+
+        orchestrator = Orchestrator(
+            project_id=project.id,
+            session_repository=session_repository,
+            message_repository=message_repository,
+        )
 
         channel = TelegramChannel(
             token=settings.telegram_bot_token,
