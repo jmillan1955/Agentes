@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from app.context import (
     ContextDatabase,
+    ContextQueryService,
     MessageRepository,
     ProjectRepository,
     SessionRepository,
@@ -32,6 +33,9 @@ def create_channel() -> TelegramChannel:
         message_repository=MessageRepository(
             database
         ),
+        context_query_service=ContextQueryService(
+            database
+        ),
     )
 
     return TelegramChannel(
@@ -39,6 +43,7 @@ def create_channel() -> TelegramChannel:
         allowed_user_id=123456,
         orchestrator=orchestrator,
     )
+
 def test_authorizes_configured_user() -> None:
     channel = create_channel()
 
@@ -96,3 +101,30 @@ def test_creates_incoming_from_telegram() -> None:
     assert incoming.message_id == (
         "telegram:654321:42"
     )
+
+def test_creates_command_from_telegram() -> None:
+    channel = create_channel()
+
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(
+            id=123456,
+            username="jose",
+        ),
+        effective_chat=SimpleNamespace(
+            id=654321,
+        ),
+        message=SimpleNamespace(
+            message_id=43,
+            text="/contexto",
+        ),
+    )
+
+    incoming = channel.create_incoming(
+        update=update,
+        content_type=ContentType.COMMAND,
+    )
+
+    assert incoming.content_type == (
+        ContentType.COMMAND
+    )
+    assert incoming.text == "/contexto"

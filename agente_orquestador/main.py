@@ -11,6 +11,7 @@ from app.orchestrator import Orchestrator
 from config import Settings
 from app.context import (
     ContextDatabase,
+    ContextQueryService,
     DocumentRepository,
     DocumentSynchronizer,
     GitCommitRepository,
@@ -132,10 +133,17 @@ def main() -> None:
             database
         )
 
+        context_query_service = ContextQueryService(
+            database
+        )
+
         orchestrator = Orchestrator(
             project_id=project.id,
             session_repository=session_repository,
             message_repository=message_repository,
+            context_query_service=(
+                context_query_service
+            ),
         )
 
         channel = TelegramChannel(

@@ -47,7 +47,12 @@ class TelegramChannel:
                 self.handle_start,
             )
         )
-
+        application.add_handler(
+            CommandHandler(
+                "contexto",
+                self.handle_context,
+            )
+        )
         application.add_handler(
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND,
@@ -110,17 +115,41 @@ class TelegramChannel:
             "de mensajes de texto."
         )
 
+
+
     async def handle_text(
         self,
         update: Update,
         context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.TEXT,
+        )
+
+    async def handle_context(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+
+    async def _process_update(
+        self,
+        update: Update,
+        content_type: ContentType,
     ) -> None:
         if not self.is_authorized(update):
             return
 
         try:
             incoming = self.create_incoming(
-                update
+                update=update,
+                content_type=content_type,
             )
 
             outgoing = self._orchestrator.process(
@@ -147,6 +176,7 @@ class TelegramChannel:
     def create_incoming(
         self,
         update: Update,
+        content_type: ContentType = ContentType.TEXT,
     ) -> IncomingMessage:
         message = update.message
         user = update.effective_user
@@ -167,7 +197,7 @@ class TelegramChannel:
             channel=ChannelName.TELEGRAM,
             user_id=str(user.id),
             conversation_id=str(chat.id),
-            content_type=ContentType.TEXT,
+            content_type=content_type,
             text=message.text,
             message_id=(
                 f"telegram:{chat.id}:"
@@ -208,6 +238,7 @@ class TelegramChannel:
             await update.message.reply_text(
                 fragment
             )
+
     async def handle_error(
         self,
         update: object,

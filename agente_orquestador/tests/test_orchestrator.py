@@ -1,5 +1,6 @@
 from app.context import (
     ContextDatabase,
+    ContextQueryService,
     MessageRepository,
     ProjectRepository,
     SessionRepository,
@@ -15,7 +16,13 @@ from app.orchestrator import Orchestrator
 
 def create_orchestrator(
     database: ContextDatabase,
+    context_query_service: ContextQueryService | None = None,
 ) -> Orchestrator:
+    if context_query_service is None:
+        context_query_service = ContextQueryService(
+            database
+        )
+
     project = ProjectRepository(
         database
     ).save(
@@ -31,6 +38,7 @@ def create_orchestrator(
         message_repository=MessageRepository(
             database
         ),
+        context_query_service=context_query_service,
     )
 
 
@@ -189,3 +197,35 @@ def test_reports_unsupported_content_type() -> None:
             "solamente proceso texto"
             in outgoing.text
         )
+
+def test_returns_context_for_command() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/contexto",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Contexto del Agente Orquestador"
+            in outgoing.text
+        )
+        assert (
+            "Proyecto: Agente Orquestador"
+            in outgoing.text
+        )
+        assert "Sesiones:" in outgoing.text
+        assert "Mensajes registrados:" in outgoing.text    
