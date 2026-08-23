@@ -4,6 +4,7 @@ from app.context.message_repository import (
 )
 from app.context.models import (
     DocumentRecord,
+    GitCommitRecord,
     MessageRecord,
     ProjectRecord,
     SessionRecord,
@@ -25,6 +26,11 @@ from app.context.document_synchronizer import (
     DocumentSynchronizer,
     DocumentSyncResult,
 )
+from app.context.git_commit_repository import (
+    GitCommitRepository,
+)
+
+
 
 __all__ = [
     "ContextDatabase",
@@ -38,4 +44,6 @@ __all__ = [
     "initialize_schema",
     "DocumentRecord",
     "DocumentRepository",
+    "GitCommitRecord",
+    "GitCommitRepository",
 ]

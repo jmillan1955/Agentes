@@ -51,3 +51,14 @@ class DocumentRecord:
     file_modified_at: str | None
     synchronized_at: str
     git_commit_hash: str | None
+
+@dataclass(frozen=True, slots=True)
+class GitCommitRecord:
+    commit_hash: str
+    project_id: int
+    parent_hash: str | None
+    author_name: str | None
+    authored_at: str
+    subject: str
+    body: str | None
+    synchronized_at: str
