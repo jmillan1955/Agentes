@@ -1,7 +1,10 @@
 from types import SimpleNamespace
 from app.context import (
+    ContextBuilder,
     ContextDatabase,
     ContextQueryService,
+    ContextSearchService,
+    DocumentRepository,
     MessageRepository,
     ProjectRepository,
     SessionRepository,
@@ -25,19 +28,35 @@ def create_channel() -> TelegramChannel:
         root_path="ruta-del-proyecto",
     )
 
+    document_repository = DocumentRepository(
+        database
+    )
+    message_repository = MessageRepository(
+        database
+    )
+
+    context_builder = ContextBuilder(
+        ContextSearchService(
+            document_repository=(
+                document_repository
+            ),
+            message_repository=(
+                message_repository
+            ),
+        )
+    )
+
     orchestrator = Orchestrator(
         project_id=project.id,
         session_repository=SessionRepository(
             database
         ),
-        message_repository=MessageRepository(
-            database
-        ),
+        message_repository=message_repository,
         context_query_service=ContextQueryService(
             database
         ),
+        context_builder=context_builder,
     )
-
     return TelegramChannel(
         token="token-de-prueba",
         allowed_user_id=123456,

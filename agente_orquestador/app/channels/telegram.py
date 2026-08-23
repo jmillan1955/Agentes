@@ -54,6 +54,12 @@ class TelegramChannel:
             )
         )
         application.add_handler(
+            CommandHandler(
+                "buscar",
+                self.handle_search,
+            )
+        )
+        application.add_handler(
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND,
                 self.handle_text,
@@ -247,4 +253,14 @@ class TelegramChannel:
         logger.error(
             "Error no controlado en Telegram",
             exc_info=context.error,
+        )
+
+    async def handle_search(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
         )

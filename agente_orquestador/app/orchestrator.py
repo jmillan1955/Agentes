@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.context import (
+    ContextBuilder,
     ContextQueryService,
     ContextSummary,
     MessageRepository,
@@ -20,8 +21,10 @@ class Orchestrator:
         session_repository: SessionRepository,
         message_repository: MessageRepository,
         context_query_service: ContextQueryService,
+        context_builder: ContextBuilder,
     ) -> None:
         self._project_id = project_id
+        self._context_builder = context_builder
         self._session_repository = (
             session_repository
         )
@@ -71,10 +74,10 @@ class Orchestrator:
         session_id: int,
     ) -> OutgoingMessage:
         if message.content_type == ContentType.COMMAND:
-            response_text = self._process_command(
-                message.text
+             response_text = self._process_command(
+                text=message.text,
+                message_id=message.message_id,
             )
-
         elif message.content_type == ContentType.TEXT:
             response_text = (
                 "He recibido correctamente tu mensaje:\n\n"
@@ -102,16 +105,30 @@ class Orchestrator:
             },
         )
 
+
     def _process_command(
         self,
         text: str | None,
+        message_id: str,
     ) -> str:
+        command_text = (text or "").strip()
+
+        parts = command_text.split(
+            maxsplit=1
+        )
+
         command = (
-            (text or "")
-            .strip()
-            .split(maxsplit=1)[0]
+            parts[0]
             .split("@", maxsplit=1)[0]
             .lower()
+            if parts
+            else ""
+        )
+
+        arguments = (
+            parts[1].strip()
+            if len(parts) > 1
+            else ""
         )
 
         if command == "/contexto":
@@ -124,10 +141,29 @@ class Orchestrator:
                 summary
             )
 
+        if command == "/buscar":
+            if not arguments:
+                return (
+                    "Debes indicar qué quieres "
+                    "buscar.\n\n"
+                    "Ejemplo:\n"
+                    "/buscar integración Telegram"
+                )
+
+            context = self._context_builder.build(
+                project_id=self._project_id,
+                query=arguments,
+                current_message_id=message_id,
+                maximum_characters=3900,
+            )
+
+            return context.text
+
         return (
             "Comando no reconocido.\n\n"
             "Comandos disponibles:\n"
-            "/contexto"
+            "/contexto\n"
+            "/buscar <consulta>"
         )
 
     @staticmethod

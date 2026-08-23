@@ -10,8 +10,10 @@ from app.context import (
 from app.orchestrator import Orchestrator
 from config import Settings
 from app.context import (
+    ContextBuilder,
     ContextDatabase,
     ContextQueryService,
+    ContextSearchService,
     DocumentRepository,
     DocumentSynchronizer,
     GitCommitRepository,
@@ -133,6 +135,21 @@ def main() -> None:
             database
         )
 
+        context_search_service = (
+            ContextSearchService(
+                document_repository=(
+                    document_repository
+                ),
+                message_repository=(
+                    message_repository
+                ),
+            )
+        )
+
+        context_builder = ContextBuilder(
+            context_search_service
+        )
+
         context_query_service = ContextQueryService(
             database
         )
@@ -144,6 +161,7 @@ def main() -> None:
             context_query_service=(
                 context_query_service
             ),
+            context_builder=context_builder,
         )
 
         channel = TelegramChannel(

@@ -1,6 +1,11 @@
+from hashlib import sha256
+
 from app.context import (
+    ContextBuilder,
     ContextDatabase,
     ContextQueryService,
+    ContextSearchService,
+    DocumentRepository,
     MessageRepository,
     ProjectRepository,
     SessionRepository,
@@ -29,18 +34,33 @@ def create_orchestrator(
         name="Agente Orquestador",
         root_path="ruta-del-proyecto",
     )
+    document_repository = DocumentRepository(
+        database
+    )
+    message_repository = MessageRepository(
+        database
+    )
+
+    context_builder = ContextBuilder(
+        ContextSearchService(
+            document_repository=(
+                document_repository
+            ),
+            message_repository=(
+                message_repository
+            ),
+        )
+    )
 
     return Orchestrator(
         project_id=project.id,
         session_repository=SessionRepository(
             database
         ),
-        message_repository=MessageRepository(
-            database
-        ),
+        message_repository=message_repository,
         context_query_service=context_query_service,
+        context_builder=context_builder,
     )
-
 
 def test_processes_text_message() -> None:
     with ContextDatabase(
@@ -229,3 +249,112 @@ def test_returns_context_for_command() -> None:
         )
         assert "Sesiones:" in outgoing.text
         assert "Mensajes registrados:" in outgoing.text    
+
+def test_searches_context_for_command() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        project = ProjectRepository(
+            database
+        ).save(
+            name="Proyecto documental",
+            root_path="ruta-documental",
+        )
+
+        content = (
+            "Telegram es el canal de entrada "
+            "del Agente Orquestador."
+        )
+
+        document_repository = (
+            DocumentRepository(database)
+        )
+
+        document_repository.save(
+            project_id=project.id,
+            relative_path="docs/telegram.md",
+            title="Integración Telegram",
+            content=content,
+            content_hash=sha256(
+                content.encode("utf-8")
+            ).hexdigest(),
+        )
+
+        message_repository = (
+            MessageRepository(database)
+        )
+
+        orchestrator = Orchestrator(
+            project_id=project.id,
+            session_repository=(
+                SessionRepository(database)
+            ),
+            message_repository=(
+                message_repository
+            ),
+            context_query_service=(
+                ContextQueryService(database)
+            ),
+            context_builder=ContextBuilder(
+                ContextSearchService(
+                    document_repository=(
+                        document_repository
+                    ),
+                    message_repository=(
+                        message_repository
+                    ),
+                )
+            ),
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/buscar Telegram",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "CONTEXTO RECUPERADO"
+            in outgoing.text
+        )
+        assert (
+            "Integración Telegram"
+            in outgoing.text
+        )
+        assert (
+            incoming.message_id
+            not in outgoing.text
+        )
+
+def test_requires_search_query() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/buscar",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar qué quieres buscar"
+            in outgoing.text
+        )
