@@ -29,7 +29,11 @@ from app.context.document_synchronizer import (
 from app.context.git_commit_repository import (
     GitCommitRepository,
 )
-
+from app.context.git_commit_synchronizer import (
+    GitCommitSynchronizer,
+    GitCommitSyncResult,
+    GitSynchronizationError,
+)
 
 
 __all__ = [
@@ -46,4 +50,7 @@ __all__ = [
     "DocumentRepository",
     "GitCommitRecord",
     "GitCommitRepository",
+    "GitCommitSynchronizer",
+    "GitCommitSyncResult",
+    "GitSynchronizationError",
 ]
