@@ -15,6 +15,10 @@ from app.context.models import (
     ContextSearchResult,
     ContextMessageMatch,
     ContextMessageSearchResult,
+    ContextBlock,
+)
+from app.context.context_builder import (
+    ContextBuilder,
 )
 from app.context.context_search_service import (
     ContextSearchService,
@@ -75,4 +79,6 @@ __all__ = [
     "ContextSearchService",
     "ContextMessageMatch",
     "ContextMessageSearchResult",
+    "ContextBlock",
+    "ContextBuilder",
 ]

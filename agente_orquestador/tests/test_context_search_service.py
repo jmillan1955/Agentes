@@ -15,6 +15,7 @@ from app.models import (
     ChannelName,
     ContentType,
     IncomingMessage,
+    OutgoingMessage,
 )
 
 def save_document(
@@ -309,3 +310,60 @@ def test_excludes_current_message() -> None:
         )
 
         assert result.messages == ()
+
+def test_excludes_outgoing_messages_by_default() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        project_id, service = create_service(
+            database
+        )
+
+        session = SessionRepository(
+            database
+        ).get_or_create_active(
+            project_id=project_id,
+            channel="telegram",
+            user_id="usuario",
+            conversation_id="conversacion",
+        )
+
+        repository = MessageRepository(
+            database
+        )
+
+        outgoing = OutgoingMessage(
+            channel=ChannelName.TELEGRAM,
+            conversation_id="conversacion",
+            content_type=ContentType.TEXT,
+            correlation_id="mensaje-entrada-1",
+            text=(
+                "Resumen automático del "
+                "contexto del orquestador"
+            ),
+        )
+        
+        repository.save_outgoing(
+            session.id,
+            outgoing,
+        )
+
+        default_result = (
+            service.search_messages(
+                project_id=project_id,
+                query="contexto orquestador",
+            )
+        )
+
+        complete_result = (
+            service.search_messages(
+                project_id=project_id,
+                query="contexto orquestador",
+                include_outgoing=True,
+            )
+        )
+
+        assert default_result.messages == ()
+        assert len(
+            complete_result.messages
+        ) == 1

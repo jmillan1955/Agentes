@@ -133,3 +133,12 @@ class ContextMessageSearchResult:
         ContextMessageMatch,
         ...,
     ]
+
+@dataclass(frozen=True, slots=True)
+class ContextBlock:
+    query: str
+    text: str
+    document_paths: tuple[str, ...]
+    message_ids: tuple[str, ...]
+    total_characters: int
+    truncated: bool

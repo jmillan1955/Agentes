@@ -133,6 +133,7 @@ class ContextSearchService:
         limit: int = 5,
         source_limit: int = 100,
         exclude_message_id: str | None = None,
+        include_outgoing: bool = False,
     ) -> ContextMessageSearchResult:
         if limit <= 0:
             raise ValueError(
@@ -176,6 +177,13 @@ class ContextSearchService:
         matches = []
 
         for message in messages:
+            if (
+                not include_outgoing
+                and message.direction
+                == "outgoing"
+            ):
+                continue
+            
             if (
                 exclude_message_id is not None
                 and message.message_id
