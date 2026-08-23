@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
+from app.models import (
+    ChannelName,
+    ContentType,
+    IncomingMessage,
+    OutgoingMessage,
+)
+from app.orchestrator import Orchestrator
+
+
+logger = logging.getLogger(__name__)
+
+
+class TelegramChannel:
+    def __init__(
+        self,
+        token: str,
+        allowed_user_id: int,
+        orchestrator: Orchestrator,
+    ) -> None:
+        self._token = token
+        self._allowed_user_id = allowed_user_id
+        self._orchestrator = orchestrator
+
+    def run(self) -> None:
+        application = (
+            Application.builder()
+            .token(self._token)
+            .build()
+        )
+
+        application.add_handler(
+            CommandHandler(
+                "start",
+                self.handle_start,
+            )
+        )
+
+        application.add_handler(
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND,
+                self.handle_text,
+            )
+        )
+
+        application.add_error_handler(
+            self.handle_error
+        )
+
+        logger.info(
+            "Iniciando canal Telegram"
+        )
+        logger.info(
+            "Control de acceso activado"
+        )
+
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+        )
+
+    def is_authorized(
+        self,
+        update: Update,
+    ) -> bool:
+        user = update.effective_user
+
+        if user is None:
+            return False
+
+        authorized = (
+            user.id == self._allowed_user_id
+        )
+
+        if not authorized:
+            logger.warning(
+                "Acceso rechazado para "
+                "el usuario %s",
+                user.id,
+            )
+
+        return authorized
+
+    async def handle_start(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        if not self.is_authorized(update):
+            return
+
+        if update.message is None:
+            return
+
+        await update.message.reply_text(
+            "Agente Orquestador conectado.\n\n"
+            "Hito 1: recepción y respuesta "
+            "de mensajes de texto."
+        )
+
+    async def handle_text(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        if not self.is_authorized(update):
+            return
+
+        try:
+            incoming = self.create_incoming(
+                update
+            )
+
+            outgoing = await asyncio.to_thread(
+                self._orchestrator.process,
+                incoming,
+            )
+
+            await self.send_outgoing(
+                update=update,
+                outgoing=outgoing,
+            )
+
+        except Exception:
+            logger.exception(
+                "No se pudo procesar "
+                "el mensaje de Telegram"
+            )
+
+            if update.message is not None:
+                await update.message.reply_text(
+                    "No se ha podido procesar "
+                    "el mensaje."
+                )
+
+    def create_incoming(
+        self,
+        update: Update,
+    ) -> IncomingMessage:
+        message = update.message
+        user = update.effective_user
+        chat = update.effective_chat
+
+        if (
+            message is None
+            or message.text is None
+            or user is None
+            or chat is None
+        ):
+            raise ValueError(
+                "La actualización de Telegram "
+                "no contiene un mensaje de texto válido"
+            )
+
+        return IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id=str(user.id),
+            conversation_id=str(chat.id),
+            content_type=ContentType.TEXT,
+            text=message.text,
+            message_id=(
+                f"telegram:{chat.id}:"
+                f"{message.message_id}"
+            ),
+            metadata={
+                "telegram_message_id": (
+                    message.message_id
+                ),
+                "telegram_username": (
+                    user.username
+                ),
+            },
+        )
+
+    async def send_outgoing(
+        self,
+        update: Update,
+        outgoing: OutgoingMessage,
+    ) -> None:
+        if update.message is None:
+            return
+
+        if outgoing.text is None:
+            return
+
+        telegram_limit = 4000
+
+        for start in range(
+            0,
+            len(outgoing.text),
+            telegram_limit,
+        ):
+            fragment = outgoing.text[
+                start:start + telegram_limit
+            ]
+
+            await update.message.reply_text(
+                fragment
+            )
+    async def handle_error(
+        self,
+        update: object,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        logger.error(
+            "Error no controlado en Telegram",
+            exc_info=context.error,
+        )
