@@ -11,6 +11,8 @@ from app.orchestrator import Orchestrator
 from config import Settings
 from app.context import (
     ContextDatabase,
+    DocumentRepository,
+    DocumentSynchronizer,
     MessageRepository,
     ProjectRepository,
     SessionRepository,
@@ -65,6 +67,35 @@ def main() -> None:
             project.id,
             project.name,
         )
+
+        document_repository = DocumentRepository(
+            database
+        )
+
+        document_synchronizer = DocumentSynchronizer(
+            repository=document_repository,
+            project_id=project.id,
+            project_root=settings.project_root_path,
+        )
+
+        sync_result = (
+            document_synchronizer.synchronize()
+        )
+
+        logger.info(
+            "Documentos sincronizados: "
+            "revisados=%s, creados=%s, "
+            "actualizados=%s, sin_cambios=%s, "
+            "eliminados=%s",
+            sync_result.scanned,
+            sync_result.created,
+            sync_result.updated,
+            sync_result.unchanged,
+            sync_result.deleted,
+        )
+
+
+
 
         session_repository = SessionRepository(
             database
