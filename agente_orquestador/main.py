@@ -13,6 +13,8 @@ from app.context import (
     ContextDatabase,
     DocumentRepository,
     DocumentSynchronizer,
+    GitCommitRepository,
+    GitCommitSynchronizer,
     MessageRepository,
     ProjectRepository,
     SessionRepository,
@@ -94,8 +96,33 @@ def main() -> None:
             sync_result.deleted,
         )
 
+        git_commit_repository = (
+            GitCommitRepository(database)
+        )
 
+        git_commit_synchronizer = (
+            GitCommitSynchronizer(
+                repository=git_commit_repository,
+                project_id=project.id,
+                project_root=(
+                    settings.project_root_path
+                ),
+            )
+        )
 
+        git_sync_result = (
+            git_commit_synchronizer.synchronize()
+        )
+
+        logger.info(
+            "Commits sincronizados: "
+            "revisados=%s, creados=%s, "
+            "actualizados=%s, sin_cambios=%s",
+            git_sync_result.scanned,
+            git_sync_result.created,
+            git_sync_result.updated,
+            git_sync_result.unchanged,
+        )
 
         session_repository = SessionRepository(
             database
