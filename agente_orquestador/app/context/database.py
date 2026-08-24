@@ -38,9 +38,9 @@ class ContextDatabase:
             )
 
         connection = sqlite3.connect(
-            self._database_path
+            self._database_path,
+            check_same_thread=False,
         )
-
         try:
             connection.row_factory = sqlite3.Row
 

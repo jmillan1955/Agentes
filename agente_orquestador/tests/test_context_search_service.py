@@ -367,3 +367,44 @@ def test_excludes_outgoing_messages_by_default() -> None:
         assert len(
             complete_result.messages
         ) == 1
+
+def test_excerpt_contains_initial_document_details() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        project_id, service = create_service(
+            database
+        )
+
+        initial_text = (
+            "SQLite es el almacén del proyecto. "
+            * 20
+        )
+
+        content = (
+            initial_text
+            + "\n\n## Ubicación\n"
+            + "CONTEXT_DATABASE_PATH="
+            + "data/context.db"
+        )
+
+        save_document(
+            repository=DocumentRepository(
+                database
+            ),
+            project_id=project_id,
+            relative_path="docs/sqlite.md",
+            title="Almacén SQLite",
+            content=content,
+        )
+
+        result = service.search_documents(
+            project_id=project_id,
+            query="archivo SQLite",
+        )
+
+        assert len(result.documents) == 1
+        assert (
+            "data/context.db"
+            in result.documents[0].excerpt
+        )

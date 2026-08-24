@@ -355,13 +355,16 @@ class ContextSearchService:
     @staticmethod
     def _create_excerpt(
         content: str,
-        maximum_length: int = 240,
+        maximum_length: int = 1600,
     ) -> str:
         compact_content = " ".join(
             content.split()
         )
 
-        if len(compact_content) <= maximum_length:
+        if (
+            len(compact_content)
+            <= maximum_length
+        ):
             return compact_content
 
         return (

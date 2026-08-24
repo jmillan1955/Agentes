@@ -22,6 +22,11 @@ from app.context import (
     ProjectRepository,
     SessionRepository,
 )
+from app.prompt_builder import PromptBuilder
+from app.providers import OllamaProvider
+from app.response_generation_service import (
+    ResponseGenerationService,
+)
 
 logging.basicConfig(
     format=(
@@ -149,21 +154,43 @@ def main() -> None:
         context_builder = ContextBuilder(
             context_search_service
         )
+        language_provider = OllamaProvider(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+            timeout_seconds=(
+                settings.ollama_timeout_seconds
+            ),
+        )
 
+        response_generation_service = (
+            ResponseGenerationService(
+                context_builder=context_builder,
+                prompt_builder=PromptBuilder(),
+                language_provider=(
+                    language_provider
+                ),
+            )
+        )
         context_query_service = ContextQueryService(
             database
         )
 
         orchestrator = Orchestrator(
             project_id=project.id,
-            session_repository=session_repository,
-            message_repository=message_repository,
+            session_repository=(
+                session_repository
+            ),
+            message_repository=(
+                message_repository
+            ),
             context_query_service=(
                 context_query_service
             ),
             context_builder=context_builder,
+            response_generation_service=(
+                response_generation_service
+            ),
         )
-
         channel = TelegramChannel(
             token=settings.telegram_bot_token,
             allowed_user_id=(

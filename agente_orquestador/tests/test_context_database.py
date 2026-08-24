@@ -1,3 +1,6 @@
+from concurrent.futures import (
+    ThreadPoolExecutor,
+)
 from pathlib import Path
 
 import pytest
@@ -129,3 +132,31 @@ def test_connection_is_unavailable_after_close() -> None:
         match="no está conectada",
     ):
         _ = database.connection
+
+def test_allows_connection_from_worker_thread(
+    tmp_path,
+) -> None:
+    database_path = (
+        tmp_path / "thread_context.db"
+    )
+
+    with ContextDatabase(
+        database_path
+    ) as database:
+        def query_database() -> int:
+            row = (
+                database.connection
+                .execute("SELECT 1")
+                .fetchone()
+            )
+
+            return int(row[0])
+
+        with ThreadPoolExecutor(
+            max_workers=1
+        ) as executor:
+            result = executor.submit(
+                query_database
+            ).result()
+
+        assert result == 1

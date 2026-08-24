@@ -80,9 +80,9 @@ class ContextBuilder:
                             f"{document.score}]"
                         ),
                         (
-                            f"Ruta: "
+                            "Documento fuente: "
                             f"{document.relative_path}"
-                        ),
+                        ),                        
                         document.excerpt,
                     ]
                 )

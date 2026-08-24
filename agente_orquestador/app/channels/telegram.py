@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram import Update
@@ -158,10 +159,42 @@ class TelegramChannel:
                 content_type=content_type,
             )
 
-            outgoing = self._orchestrator.process(
-                incoming
-            )
+            if (
+                content_type
+                == ContentType.TEXT
+                and update.message is not None
+            ):
+                await update.message.reply_text(
+                    "Consulta recibida. "
+                    "Generando respuesta..."
+                )
 
+                logger.info(
+                    "Generando respuesta para %s",
+                    incoming.message_id,
+                )
+
+                outgoing = await asyncio.to_thread(
+                    self._orchestrator.process,
+                    incoming,
+                )
+
+                logger.info(
+                    "Respuesta generada para %s "
+                    "en %s segundos",
+                    incoming.message_id,
+                    outgoing.metadata.get(
+                        "elapsed_seconds",
+                        "desconocido",
+                    ),
+                )
+
+            else:
+                outgoing = (
+                    self._orchestrator.process(
+                        incoming
+                    )
+                )
             await self.send_outgoing(
                 update=update,
                 outgoing=outgoing,
@@ -219,6 +252,49 @@ class TelegramChannel:
             },
         )
 
+
+    @staticmethod
+    def format_outgoing_text(
+        outgoing: OutgoingMessage,
+    ) -> str:
+        text = outgoing.text or ""
+
+        elapsed = outgoing.metadata.get(
+            "elapsed_seconds"
+        )
+
+        if not isinstance(
+            elapsed,
+            (int, float),
+        ):
+            return text
+
+        minutes = elapsed / 60
+        formatted_minutes = (
+            f"{minutes:.2f}"
+            .replace(".", ",")
+        )
+
+        lines = [
+            text,
+            "",
+            (
+                "⏱ Tiempo de ejecución: "
+                f"{formatted_minutes} minutos"
+            ),
+        ]
+
+        model = outgoing.metadata.get(
+            "model"
+        )
+
+        if isinstance(model, str) and model:
+            lines.append(
+                f"🤖 Modelo: {model}"
+            )
+
+        return "\n".join(lines)
+
     async def send_outgoing(
         self,
         update: Update,
@@ -230,20 +306,37 @@ class TelegramChannel:
         if outgoing.text is None:
             return
 
+        formatted_text = (
+            self.format_outgoing_text(
+                outgoing
+            )
+        )
+
         telegram_limit = 4000
+
+        logger.info(
+            "Enviando respuesta a Telegram: "
+            "%s caracteres",
+            len(formatted_text),
+        )
 
         for start in range(
             0,
-            len(outgoing.text),
+            len(formatted_text),
             telegram_limit,
         ):
-            fragment = outgoing.text[
+            fragment = formatted_text[
                 start:start + telegram_limit
             ]
 
             await update.message.reply_text(
                 fragment
             )
+
+        logger.info(
+            "Respuesta enviada correctamente "
+            "a Telegram"
+        )
 
     async def handle_error(
         self,

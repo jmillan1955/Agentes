@@ -13,6 +13,13 @@ from app.models import (
     OutgoingMessage,
 )
 
+from app.providers import (
+    LanguageProviderError,
+)
+from app.response_generation_service import (
+    ResponseGenerationService,
+)
+
 
 class Orchestrator:
     def __init__(
@@ -22,6 +29,9 @@ class Orchestrator:
         message_repository: MessageRepository,
         context_query_service: ContextQueryService,
         context_builder: ContextBuilder,
+        response_generation_service: (
+            ResponseGenerationService
+        ),
     ) -> None:
         self._project_id = project_id
         self._context_builder = context_builder
@@ -34,7 +44,10 @@ class Orchestrator:
         self._context_query_service = (
             context_query_service
         )
-
+        self._response_generation_service = (
+            response_generation_service
+        )
+    
     def process(
         self,
         message: IncomingMessage,
@@ -68,21 +81,74 @@ class Orchestrator:
 
         return outgoing
 
+
     def _create_response(
         self,
         message: IncomingMessage,
         session_id: int,
     ) -> OutgoingMessage:
+        metadata = {
+            "processor": "orchestrator",
+            "session_id": session_id,
+        }
+
         if message.content_type == ContentType.COMMAND:
-             response_text = self._process_command(
+            response_text = self._process_command(
                 text=message.text,
                 message_id=message.message_id,
             )
+
         elif message.content_type == ContentType.TEXT:
-            response_text = (
-                "He recibido correctamente tu mensaje:\n\n"
-                f"{message.text}"
-            )
+            try:
+                answer = (
+                    self._response_generation_service
+                    .generate(
+                        project_id=self._project_id,
+                        query=message.text or "",
+                        current_message_id=(
+                            message.message_id
+                        ),
+                    )
+                )
+
+                response_text = answer.text
+
+                metadata.update(
+                    {
+                        "model": answer.model,
+                        "elapsed_seconds": (
+                            answer.elapsed_seconds
+                        ),
+                        "context_documents": (
+                            answer.document_paths
+                        ),
+                        "context_messages": (
+                            answer.message_ids
+                        ),
+                        "context_characters": (
+                            answer.context_characters
+                        ),
+                        "context_truncated": (
+                            answer.context_truncated
+                        ),
+                    }
+                )
+
+            except LanguageProviderError as error:
+                response_text = (
+                    "No se ha podido generar "
+                    "la respuesta.\n\n"
+                    f"{error}"
+                )
+
+                metadata.update(
+                    {
+                        "error": (
+                            type(error).__name__
+                        ),
+                        "error_message": str(error),
+                    }
+                )
 
         else:
             response_text = (
@@ -97,12 +163,7 @@ class Orchestrator:
             content_type=ContentType.TEXT,
             correlation_id=message.message_id,
             text=response_text,
-            metadata={
-                "processor": (
-                    "provisional_orchestrator"
-                ),
-                "session_id": session_id,
-            },
+            metadata=metadata,
         )
 
 

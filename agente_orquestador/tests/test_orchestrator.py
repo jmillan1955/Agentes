@@ -17,15 +17,62 @@ from app.models import (
     IncomingMessage,
 )
 from app.orchestrator import Orchestrator
+from app.providers import (
+    LanguageProviderError,
+)
+from app.response_generation_service import (
+    GeneratedAnswer,
+)
+
+
+class FakeResponseGenerationService:
+    def generate(
+        self,
+        project_id: int,
+        query: str,
+        current_message_id: str,
+    ) -> GeneratedAnswer:
+        return GeneratedAnswer(
+            text=(
+                "Respuesta generada para: "
+                f"{query}"
+            ),
+            model="modelo-de-prueba",
+            elapsed_seconds=1.5,
+            document_paths=(),
+            message_ids=(),
+            context_characters=100,
+            context_truncated=False,
+        )
+
+
+class FailingResponseGenerationService:
+    def generate(
+        self,
+        project_id: int,
+        query: str,
+        current_message_id: str,
+    ) -> GeneratedAnswer:
+        raise LanguageProviderError(
+            "Proveedor no disponible"
+        )
 
 
 def create_orchestrator(
     database: ContextDatabase,
-    context_query_service: ContextQueryService | None = None,
+    context_query_service: (
+        ContextQueryService | None
+    ) = None,
+    response_generation_service=None,
 ) -> Orchestrator:
     if context_query_service is None:
-        context_query_service = ContextQueryService(
-            database
+        context_query_service = (
+            ContextQueryService(database)
+        )
+
+    if response_generation_service is None:
+        response_generation_service = (
+            FakeResponseGenerationService()
         )
 
     project = ProjectRepository(
@@ -34,6 +81,7 @@ def create_orchestrator(
         name="Agente Orquestador",
         root_path="ruta-del-proyecto",
     )
+
     document_repository = DocumentRepository(
         database
     )
@@ -58,9 +106,15 @@ def create_orchestrator(
             database
         ),
         message_repository=message_repository,
-        context_query_service=context_query_service,
+        context_query_service=(
+            context_query_service
+        ),
         context_builder=context_builder,
+        response_generation_service=(
+            response_generation_service
+        ),
     )
+
 
 def test_processes_text_message() -> None:
     with ContextDatabase(
@@ -93,6 +147,16 @@ def test_processes_text_message() -> None:
         )
         assert outgoing.text is not None
         assert "Hola, agente." in outgoing.text
+        assert (
+            outgoing.metadata["model"]
+            == "modelo-de-prueba"
+        )
+        assert (
+            outgoing.metadata[
+                "elapsed_seconds"
+            ]
+            == 1.5
+        )
 
 
 def test_persists_input_and_output() -> None:
@@ -126,13 +190,11 @@ def test_persists_input_and_output() -> None:
         )
 
         assert len(messages) == 2
-
         assert messages[0].direction == "incoming"
         assert (
             messages[0].text
             == "Mensaje persistente."
         )
-
         assert messages[1].direction == "outgoing"
         assert (
             messages[1].correlation_id
@@ -218,6 +280,7 @@ def test_reports_unsupported_content_type() -> None:
             in outgoing.text
         )
 
+
 def test_returns_context_for_command() -> None:
     with ContextDatabase(
         ":memory:"
@@ -248,7 +311,11 @@ def test_returns_context_for_command() -> None:
             in outgoing.text
         )
         assert "Sesiones:" in outgoing.text
-        assert "Mensajes registrados:" in outgoing.text    
+        assert (
+            "Mensajes registrados:"
+            in outgoing.text
+        )
+
 
 def test_searches_context_for_command() -> None:
     with ContextDatabase(
@@ -284,6 +351,17 @@ def test_searches_context_for_command() -> None:
             MessageRepository(database)
         )
 
+        context_builder = ContextBuilder(
+            ContextSearchService(
+                document_repository=(
+                    document_repository
+                ),
+                message_repository=(
+                    message_repository
+                ),
+            )
+        )
+
         orchestrator = Orchestrator(
             project_id=project.id,
             session_repository=(
@@ -295,15 +373,9 @@ def test_searches_context_for_command() -> None:
             context_query_service=(
                 ContextQueryService(database)
             ),
-            context_builder=ContextBuilder(
-                ContextSearchService(
-                    document_repository=(
-                        document_repository
-                    ),
-                    message_repository=(
-                        message_repository
-                    ),
-                )
+            context_builder=context_builder,
+            response_generation_service=(
+                FakeResponseGenerationService()
             ),
         )
 
@@ -328,10 +400,7 @@ def test_searches_context_for_command() -> None:
             "Integración Telegram"
             in outgoing.text
         )
-        assert (
-            incoming.message_id
-            not in outgoing.text
-        )
+
 
 def test_requires_search_query() -> None:
     with ContextDatabase(
@@ -357,4 +426,47 @@ def test_requires_search_query() -> None:
         assert (
             "Debes indicar qué quieres buscar"
             in outgoing.text
+        )
+
+
+def test_controls_language_provider_error() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database=database,
+            response_generation_service=(
+                FailingResponseGenerationService()
+            ),
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.TEXT,
+            text="Genera una respuesta",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "No se ha podido generar "
+            "la respuesta"
+            in outgoing.text
+        )
+        assert (
+            "Proveedor no disponible"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata["error"]
+            == "LanguageProviderError"
+        )
+        assert (
+            incoming.message_id
+            not in outgoing.text
         )
