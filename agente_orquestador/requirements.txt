@@ -1,3 +1,4 @@
 pytest
 python-dotenv
 python-telegram-bot
+httpxS

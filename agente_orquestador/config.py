@@ -24,6 +24,10 @@ class Settings:
     project_root_path: Path
     git_repository: str | None
 
+    ollama_base_url: str
+    ollama_model: str
+    ollama_timeout_seconds: float
+
     @classmethod
     def load(cls) -> "Settings":
         load_dotenv(BASE_DIR / ".env")
@@ -89,6 +93,52 @@ class Settings:
             "",
         ).strip()
 
+
+        ollama_base_url = os.getenv(
+            "OLLAMA_BASE_URL",
+            "http://127.0.0.1:11434",
+        ).strip()
+
+        if not ollama_base_url:
+            raise RuntimeError(
+                "OLLAMA_BASE_URL no puede "
+                "estar vacía"
+            )
+
+        ollama_model = os.getenv(
+            "OLLAMA_MODEL",
+            "qwen3:4b",
+        ).strip()
+
+        if not ollama_model:
+            raise RuntimeError(
+                "OLLAMA_MODEL no puede "
+                "estar vacío"
+            )
+
+        timeout_value = os.getenv(
+            "OLLAMA_TIMEOUT_SECONDS",
+            "300",
+        ).strip()
+
+        try:
+            ollama_timeout_seconds = float(
+                timeout_value
+            )
+        except ValueError as error:
+            raise RuntimeError(
+                "OLLAMA_TIMEOUT_SECONDS debe "
+                "ser un número"
+            ) from error
+
+        if ollama_timeout_seconds <= 0:
+            raise RuntimeError(
+                "OLLAMA_TIMEOUT_SECONDS debe "
+                "ser mayor que cero"
+            )
+
+
+
         return cls(
             agent_name=os.getenv(
                 "AGENT_NAME",
@@ -111,5 +161,10 @@ class Settings:
             project_root_path=BASE_DIR.resolve(),
             git_repository=(
                 git_repository or None
+            ),
+            ollama_base_url=ollama_base_url,
+            ollama_model=ollama_model,
+            ollama_timeout_seconds=(
+                ollama_timeout_seconds
             ),
         )
