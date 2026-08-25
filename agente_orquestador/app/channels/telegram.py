@@ -38,10 +38,19 @@ class TelegramChannel:
         transcription_service: (
             TranscriptionService | None
         ) = None,
+        allowed_user_ids: tuple[
+            int,
+            ...,
+        ] | None = None,
     ) -> None:
         self._token = token
-        self._allowed_user_id = (
-            allowed_user_id
+        if allowed_user_ids is None:
+            allowed_user_ids = (
+                allowed_user_id,
+            )
+
+        self._allowed_user_ids = frozenset(
+            allowed_user_ids
         )
         self._orchestrator = orchestrator
         self._transcription_service = (
@@ -153,7 +162,7 @@ class TelegramChannel:
 
         authorized = (
             user.id
-            == self._allowed_user_id
+            in self._allowed_user_ids
         )
 
         if not authorized:
@@ -164,7 +173,6 @@ class TelegramChannel:
             )
 
         return authorized
-
     async def handle_start(
         self,
         update: Update,

@@ -142,3 +142,49 @@ def test_rejects_invalid_ollama_timeout(
         ),
     ):
         Settings.load()
+
+def test_loads_multiple_telegram_users(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_ALLOWED_USER_IDS",
+        "123456,234567,345678,456789",
+    )
+
+    settings = Settings.load()
+
+    assert (
+        settings.telegram_allowed_user_ids
+        == (
+            123456,
+            234567,
+            345678,
+            456789,
+        )
+    )
+
+
+def test_rejects_invalid_telegram_user_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_ALLOWED_USER_IDS",
+        "123456,usuario-invalido",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "TELEGRAM_ALLOWED_USER_IDS debe "
+            "contener numeros enteros"
+        ),
+    ):
+        Settings.load()

@@ -17,7 +17,10 @@ class Settings:
     environment: str
 
     telegram_bot_token: str
-    telegram_allowed_user_id: int
+    telegram_allowed_user_ids: tuple[
+        int,
+        ...,
+    ]
 
     context_database_path: Path
     project_name: str
@@ -30,6 +33,14 @@ class Settings:
     ollama_timeout_seconds: float
 
     whisper_model: str
+
+    @property
+    def telegram_allowed_user_id(self) -> int:
+        """
+        Mantiene temporalmente compatibilidad con
+        el canal que todavÃ­a espera un solo usuario.
+        """
+        return self.telegram_allowed_user_ids[0]
 
     @classmethod
     def load(cls) -> "Settings":
@@ -45,25 +56,46 @@ class Settings:
                 "Falta TELEGRAM_BOT_TOKEN en .env"
             )
 
-        user_id_value = os.getenv(
-            "TELEGRAM_ALLOWED_USER_ID",
+        user_ids_value = os.getenv(
+            "TELEGRAM_ALLOWED_USER_IDS",
             "",
         ).strip()
 
-        if not user_id_value:
+        if not user_ids_value:
+            user_ids_value = os.getenv(
+                "TELEGRAM_ALLOWED_USER_ID",
+                "",
+            ).strip()
+
+        if not user_ids_value:
             raise RuntimeError(
-                "Falta TELEGRAM_ALLOWED_USER_ID "
+                "Falta TELEGRAM_ALLOWED_USER_IDS "
                 "en .env"
             )
 
         try:
-            user_id = int(user_id_value)
+            allowed_user_ids = tuple(
+                dict.fromkeys(
+                    int(value.strip())
+                    for value in (
+                        user_ids_value.split(",")
+                    )
+                    if value.strip()
+                )
+            )
 
         except ValueError as error:
             raise RuntimeError(
-                "TELEGRAM_ALLOWED_USER_ID debe "
-                "ser un nÃºmero entero"
+                "TELEGRAM_ALLOWED_USER_IDS debe "
+                "contener numeros enteros "
+                "separados por comas"
             ) from error
+
+        if not allowed_user_ids:
+            raise RuntimeError(
+                "TELEGRAM_ALLOWED_USER_IDS debe "
+                "contener al menos un usuario"
+            )
 
         database_value = os.getenv(
             "CONTEXT_DATABASE_PATH",
@@ -73,7 +105,7 @@ class Settings:
         if not database_value:
             raise RuntimeError(
                 "CONTEXT_DATABASE_PATH no puede "
-                "estar vacÃ­o"
+                "estar vaci­o"
             )
 
         database_path = Path(
@@ -180,7 +212,9 @@ class Settings:
                 "development",
             ).strip(),
             telegram_bot_token=token,
-            telegram_allowed_user_id=user_id,
+            telegram_allowed_user_ids=(
+                allowed_user_ids
+            ),
             context_database_path=(
                 database_path.resolve()
             ),

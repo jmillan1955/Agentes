@@ -559,3 +559,46 @@ def test_processes_simple_command() -> None:
         ]
         == "simple"
     )
+
+def test_authorizes_second_configured_user() -> None:
+    channel = TelegramChannel(
+        token="token-prueba",
+        allowed_user_id=123456,
+        allowed_user_ids=(
+            123456,
+            234567,
+            345678,
+            456789,
+        ),
+        orchestrator=SimpleNamespace(),
+    )
+
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(
+            id=234567,
+        ),
+    )
+
+    assert channel.is_authorized(update)
+
+
+def test_rejects_unconfigured_family_user() -> None:
+    channel = TelegramChannel(
+        token="token-prueba",
+        allowed_user_id=123456,
+        allowed_user_ids=(
+            123456,
+            234567,
+            345678,
+            456789,
+        ),
+        orchestrator=SimpleNamespace(),
+    )
+
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(
+            id=999999,
+        ),
+    )
+
+    assert not channel.is_authorized(update)

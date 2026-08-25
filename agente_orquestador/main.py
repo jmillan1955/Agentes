@@ -314,10 +314,10 @@ def main() -> None:
             allowed_user_id=(
                 settings.telegram_allowed_user_id
             ),
-            orchestrator=orchestrator,
-            transcription_service=(
-                transcription_service
+            allowed_user_ids=(
+                settings.telegram_allowed_user_ids
             ),
+            orchestrator=orchestrator,
         )
 
         logger.info(
