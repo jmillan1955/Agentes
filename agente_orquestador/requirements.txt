@@ -2,3 +2,4 @@ pytest
 python-dotenv
 python-telegram-bot
 httpxS
+faster-whisper

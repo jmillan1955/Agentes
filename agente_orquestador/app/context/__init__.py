@@ -1,39 +1,13 @@
-from app.context.database import ContextDatabase
-from app.context.message_repository import (
-    MessageRepository,
-)
-from app.context.models import (
-    ContextCommitSummary,
-    ContextDocumentSummary,
-    ContextSummary,
-    DocumentRecord,
-    GitCommitRecord,
-    MessageRecord,
-    ProjectRecord,
-    SessionRecord,
-    ContextDocumentMatch,
-    ContextSearchResult,
-    ContextMessageMatch,
-    ContextMessageSearchResult,
-    ContextBlock,
-)
 from app.context.context_builder import (
     ContextBuilder,
+)
+from app.context.context_query_service import (
+    ContextQueryService,
 )
 from app.context.context_search_service import (
     ContextSearchService,
 )
-
-from app.context.project_repository import (
-    ProjectRepository,
-)
-from app.context.schema import (
-    SCHEMA_VERSION,
-    initialize_schema,
-)
-from app.context.session_repository import (
-    SessionRepository,
-)
+from app.context.database import ContextDatabase
 from app.context.document_repository import (
     DocumentRepository,
 )
@@ -49,12 +23,66 @@ from app.context.git_commit_synchronizer import (
     GitCommitSyncResult,
     GitSynchronizationError,
 )
-from app.context.context_query_service import (
-    ContextQueryService,
+from app.context.message_repository import (
+    MessageRepository,
+)
+from app.context.models import (
+    ContextBlock,
+    ContextCommitSummary,
+    ContextDocumentMatch,
+    ContextDocumentSummary,
+    ContextMessageMatch,
+    ContextMessageSearchResult,
+    ContextSearchResult,
+    ContextSummary,
+    DocumentRecord,
+    GitCommitRecord,
+    MessageRecord,
+    ProjectRecord,
+    SessionRecord,
+)
+from app.context.project_repository import (
+    ProjectRepository,
+)
+from app.context.schema import (
+    SCHEMA_VERSION,
+    initialize_schema,
+)
+from app.context.session_repository import (
+    SessionRepository,
+)
+from app.context.task_clarification_response_repository import (
+    TaskClarificationResponseRepository,
+)
+from app.context.task_repository import (
+    TaskRepository,
+)
+from app.context.task_plan_repository import (
+    TaskPlanRepository,
 )
 
 __all__ = [
+    "ContextBlock",
+    "ContextBuilder",
+    "ContextCommitSummary",
     "ContextDatabase",
+    "ContextDocumentMatch",
+    "ContextDocumentSummary",
+    "ContextMessageMatch",
+    "ContextMessageSearchResult",
+    "ContextQueryService",
+    "ContextSearchResult",
+    "ContextSearchService",
+    "ContextSummary",
+    "DocumentRecord",
+    "DocumentRepository",
+    "DocumentSynchronizer",
+    "DocumentSyncResult",
+    "GitCommitRecord",
+    "GitCommitRepository",
+    "GitCommitSynchronizer",
+    "GitCommitSyncResult",
+    "GitSynchronizationError",
     "MessageRecord",
     "MessageRepository",
     "ProjectRecord",
@@ -62,23 +90,8 @@ __all__ = [
     "SCHEMA_VERSION",
     "SessionRecord",
     "SessionRepository",
+    "TaskClarificationResponseRepository",
+    "TaskRepository",
     "initialize_schema",
-    "DocumentRecord",
-    "DocumentRepository",
-    "GitCommitRecord",
-    "GitCommitRepository",
-    "GitCommitSynchronizer",
-    "GitCommitSyncResult",
-    "GitSynchronizationError",
-    "ContextCommitSummary",
-    "ContextDocumentSummary",
-    "ContextQueryService",
-    "ContextSummary",
-    "ContextDocumentMatch",
-    "ContextSearchResult",
-    "ContextSearchService",
-    "ContextMessageMatch",
-    "ContextMessageSearchResult",
-    "ContextBlock",
-    "ContextBuilder",
+    "TaskPlanRepository",
 ]

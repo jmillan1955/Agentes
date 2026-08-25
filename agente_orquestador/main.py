@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import logging
 
+from app.audio import TranscriptionService
+
 from app.channels import TelegramChannel
-from app.context import (
-    ContextDatabase,
-    ProjectRepository,
-)
-from app.orchestrator import Orchestrator
-from config import Settings
 from app.context import (
     ContextBuilder,
     ContextDatabase,
@@ -21,6 +17,20 @@ from app.context import (
     MessageRepository,
     ProjectRepository,
     SessionRepository,
+    TaskClarificationResponseRepository,
+    TaskPlanRepository,
+    TaskRepository,
+)
+from app.orchestrator import Orchestrator
+from app.planning import PlanningPromptBuilder
+from app.planning.clarification_workflow import (
+    ClarificationWorkflowService,
+)
+from app.planning.formatter import (
+    PlanningFormatter,
+)
+from app.planning.service import (
+    PlanningService,
 )
 from app.prompt_builder import PromptBuilder
 from app.providers import OllamaProvider
@@ -31,6 +41,8 @@ from app.routing import (
     ProvisionalTaskHandler,
     RequestClassifier,
 )
+from config import Settings
+
 
 logging.basicConfig(
     format=(
@@ -144,6 +156,20 @@ def main() -> None:
             database
         )
 
+        task_repository = TaskRepository(
+            database
+        )
+
+        clarification_repository = (
+            TaskClarificationResponseRepository(
+                database
+            )
+        )
+
+        task_plan_repository = (
+            TaskPlanRepository(database)
+        )
+
         context_search_service = (
             ContextSearchService(
                 document_repository=(
@@ -158,6 +184,7 @@ def main() -> None:
         context_builder = ContextBuilder(
             context_search_service
         )
+
         language_provider = OllamaProvider(
             base_url=settings.ollama_base_url,
             model=settings.ollama_model,
@@ -175,6 +202,35 @@ def main() -> None:
                 ),
             )
         )
+
+        planning_service = PlanningService(
+            task_repository=task_repository,
+            clarification_repository=(
+                clarification_repository
+            ),
+            plan_repository=(
+                task_plan_repository
+            ),
+            prompt_builder=(
+                PlanningPromptBuilder()
+            ),
+            language_provider=(
+                language_provider
+            ),
+        )
+
+        clarification_workflow_service = (
+            ClarificationWorkflowService(
+                task_repository=task_repository,
+                clarification_repository=(
+                    clarification_repository
+                ),
+                planning_service=(
+                    planning_service
+                ),
+            )
+        )
+
         context_query_service = ContextQueryService(
             database
         )
@@ -186,6 +242,9 @@ def main() -> None:
             ),
             message_repository=(
                 message_repository
+            ),
+            task_repository=(
+                task_repository
             ),
             context_query_service=(
                 context_query_service
@@ -200,16 +259,36 @@ def main() -> None:
             task_handler=(
                 ProvisionalTaskHandler()
             ),
-
+            clarification_workflow_service=(
+                clarification_workflow_service
+            ),
+            planning_formatter=(
+                PlanningFormatter()
+            ),
         )
+
+        transcription_service = (
+            TranscriptionService(
+                model_name=(
+                    settings.whisper_model
+                ),
+                device="cpu",
+                compute_type="int8",
+                language="es",
+            )
+        )
+
         channel = TelegramChannel(
             token=settings.telegram_bot_token,
             allowed_user_id=(
                 settings.telegram_allowed_user_id
             ),
             orchestrator=orchestrator,
+            transcription_service=(
+                transcription_service
+            ),
         )
-
+        
         logger.info(
             "Iniciando %s versión %s",
             settings.agent_name,

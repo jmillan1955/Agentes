@@ -9,6 +9,7 @@ from app.context import (
     MessageRepository,
     ProjectRepository,
     SessionRepository,
+    TaskRepository,
 )
 from app.models import (
     Attachment,
@@ -23,7 +24,7 @@ from app.providers import (
 from app.response_generation_service import (
     GeneratedAnswer,
 )
-
+from app.tasks import TaskStatus
 
 class FakeResponseGenerationService:
     def generate(
@@ -118,6 +119,9 @@ def create_orchestrator(
             database
         ),
         message_repository=message_repository,
+        task_repository=TaskRepository(
+            database
+        ),
         context_query_service=(
             context_query_service
         ),
@@ -382,6 +386,9 @@ def test_searches_context_for_command() -> None:
             message_repository=(
                 message_repository
             ),
+            task_repository=TaskRepository(
+                database
+            ),
             context_query_service=(
                 ContextQueryService(database)
             ),
@@ -635,6 +642,71 @@ def test_routes_task_without_calling_language_provider() -> None:
         )
         assert (
             outgoing.metadata["task_status"]
-            == "pending_planning"
+            == "pending_clarification"
+        )
+        assert len(
+            outgoing.metadata[
+                "task_missing_information"
+            ]
+        ) == 5
+        assert (
+            "Necesito que aclares"
+            in (outgoing.text or "")
         )
         assert "model" not in outgoing.metadata
+
+def test_persists_routed_task() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.TEXT,
+            text=(
+                "Crea el proyecto "
+                "agente_audioText"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        task_id = outgoing.metadata[
+            "task_id"
+        ]
+
+        task = TaskRepository(
+            database
+        ).get_by_id(task_id)
+
+        assert task is not None
+        assert (
+            task.source_message_id
+            == incoming.message_id
+        )
+        assert (
+            task.target_project_name
+            == "agente_audioText"
+        )
+        assert (
+            task.status
+            == TaskStatus.PENDING_CLARIFICATION
+        )
+        assert len(
+            task.missing_information
+        ) == 5
+        assert (
+            "Necesito que aclares"
+            in (outgoing.text or "")
+        )
+        assert (
+            f"Identificador: #{task.id}"
+            in (outgoing.text or "")
+        )

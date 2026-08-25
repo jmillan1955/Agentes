@@ -2,6 +2,7 @@ from concurrent.futures import (
     ThreadPoolExecutor,
 )
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -16,8 +17,29 @@ EXPECTED_TABLES = {
     "projects",
     "sessions",
     "messages",
+    "tasks",
+    "task_clarification_responses",
+    "task_plans",
     "documents",
     "git_commits",
+}
+
+
+EXPECTED_TASK_COLUMNS = {
+    "id",
+    "project_id",
+    "session_id",
+    "source_message_id",
+    "title",
+    "description",
+    "target_project_name",
+    "status",
+    "missing_information_json",
+    "plan_json",
+    "created_at",
+    "updated_at",
+    "authorized_at",
+    "completed_at",
 }
 
 
@@ -59,6 +81,122 @@ def test_creates_database_and_tables(
         assert version == SCHEMA_VERSION
 
     assert database_path.is_file()
+
+
+def test_creates_task_columns() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            "PRAGMA table_info(tasks)"
+        ).fetchall()
+
+        columns = {
+            row["name"]
+            for row in rows
+        }
+
+        assert (
+            EXPECTED_TASK_COLUMNS
+            <= columns
+        )
+
+
+def test_creates_task_foreign_keys() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            "PRAGMA foreign_key_list(tasks)"
+        ).fetchall()
+
+        references = {
+            (
+                row["from"],
+                row["table"],
+                row["to"],
+            )
+            for row in rows
+        }
+
+        assert (
+            "project_id",
+            "projects",
+            "id",
+        ) in references
+
+        assert (
+            "session_id",
+            "sessions",
+            "id",
+        ) in references
+
+
+def test_updates_existing_database(
+    tmp_path: Path,
+) -> None:
+    database_path = (
+        tmp_path / "existing_context.db"
+    )
+
+    connection = sqlite3.connect(
+        database_path
+    )
+
+    connection.execute(
+        """
+        CREATE TABLE legacy_marker (
+            id INTEGER PRIMARY KEY
+        )
+        """
+    )
+    connection.execute(
+        "PRAGMA user_version = 2"
+    )
+    connection.commit()
+    connection.close()
+
+    with ContextDatabase(
+        database_path
+    ) as database:
+        tables = get_table_names(database)
+
+        assert "legacy_marker" in tables
+        assert "tasks" in tables
+
+        version = database.connection.execute(
+            "PRAGMA user_version"
+        ).fetchone()[0]
+
+        assert version == SCHEMA_VERSION
+
+
+def test_rejects_newer_schema(
+    tmp_path: Path,
+) -> None:
+    database_path = (
+        tmp_path / "future_context.db"
+    )
+
+    connection = sqlite3.connect(
+        database_path
+    )
+    connection.execute(
+        "PRAGMA user_version = 999"
+    )
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "versión de esquema "
+            "más reciente"
+        ),
+    ):
+        ContextDatabase(
+            database_path
+        ).connect()
 
 
 def test_activates_foreign_keys_and_wal(
@@ -133,8 +271,9 @@ def test_connection_is_unavailable_after_close() -> None:
     ):
         _ = database.connection
 
+
 def test_allows_connection_from_worker_thread(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     database_path = (
         tmp_path / "thread_context.db"
@@ -143,6 +282,7 @@ def test_allows_connection_from_worker_thread(
     with ContextDatabase(
         database_path
     ) as database:
+
         def query_database() -> int:
             row = (
                 database.connection

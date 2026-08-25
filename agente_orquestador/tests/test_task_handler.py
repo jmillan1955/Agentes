@@ -5,26 +5,65 @@ from app.routing import (
     RequestKind,
     RoutingDecision,
 )
+from app.tasks import (
+    TaskRecord,
+    TaskStatus,
+)
 
 
-def test_handles_task_without_executing_it() -> None:
-    decision = RoutingDecision(
+def create_decision() -> RoutingDecision:
+    return RoutingDecision(
         kind=RequestKind.TASK,
         summary="Añadir un canal de correo",
         confidence=0.90,
+        project_name="agente_audioText",
     )
 
+
+def create_task(
+    status: TaskStatus = (
+        TaskStatus.PENDING_PLANNING
+    ),
+    missing_information: tuple[
+        str,
+        ...,
+    ] = (),
+) -> TaskRecord:
+    return TaskRecord(
+        id=1,
+        project_id=1,
+        session_id=1,
+        source_message_id="mensaje-1",
+        title="Crear agente_audioText",
+        description=(
+            "Crear agente_audioText"
+        ),
+        target_project_name=(
+            "agente_audioText"
+        ),
+        status=status,
+        missing_information=(
+            missing_information
+        ),
+        plan=(),
+        created_at="fecha",
+        updated_at="fecha",
+        authorized_at=None,
+        completed_at=None,
+    )
+
+
+def test_handles_task_without_executing_it() -> None:
     result = (
         ProvisionalTaskHandler()
-        .handle(decision)
+        .handle(
+            decision=create_decision(),
+            task=create_task(),
+        )
     )
 
     assert (
         "PETICIÓN IDENTIFICADA COMO TAREA"
-        in result.text
-    )
-    assert (
-        "Añadir un canal de correo"
         in result.text
     )
     assert (
@@ -35,31 +74,56 @@ def test_handles_task_without_executing_it() -> None:
         result.status
         == "pending_planning"
     )
-    assert result.project_name is None
+    assert (
+        result.project_name
+        == "agente_audioText"
+    )
 
 
 def test_includes_detected_project() -> None:
-    decision = RoutingDecision(
-        kind=RequestKind.TASK,
-        summary=(
-            "Modificar el Agente Orquestador"
-        ),
-        confidence=0.90,
-        project_name="Agente Orquestador",
-    )
-
     result = (
         ProvisionalTaskHandler()
-        .handle(decision)
+        .handle(
+            decision=create_decision(),
+            task=create_task(),
+        )
     )
 
     assert (
-        "Proyecto: Agente Orquestador"
+        "Proyecto: agente_audioText"
+        in result.text
+    )
+
+
+def test_includes_clarification_questions() -> None:
+    result = (
+        ProvisionalTaskHandler()
+        .handle(
+            decision=create_decision(),
+            task=create_task(
+                status=(
+                    TaskStatus
+                    .PENDING_CLARIFICATION
+                ),
+                missing_information=(
+                    "¿Qué formato de entrada?",
+                    "¿Qué formato de salida?",
+                ),
+            ),
+        )
+    )
+
+    assert (
+        "Estado: pendiente de aclaraciones"
         in result.text
     )
     assert (
-        result.project_name
-        == "Agente Orquestador"
+        "1. ¿Qué formato de entrada?"
+        in result.text
+    )
+    assert (
+        "2. ¿Qué formato de salida?"
+        in result.text
     )
 
 
@@ -78,5 +142,6 @@ def test_rejects_non_task_decision() -> None:
         ),
     ):
         ProvisionalTaskHandler().handle(
-            decision
+            decision=decision,
+            task=create_task(),
         )

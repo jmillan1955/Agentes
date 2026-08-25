@@ -28,6 +28,8 @@ class Settings:
     ollama_model: str
     ollama_timeout_seconds: float
 
+    whisper_model: str
+
     @classmethod
     def load(cls) -> "Settings":
         load_dotenv(BASE_DIR / ".env")
@@ -49,11 +51,13 @@ class Settings:
 
         if not user_id_value:
             raise RuntimeError(
-                "Falta TELEGRAM_ALLOWED_USER_ID en .env"
+                "Falta TELEGRAM_ALLOWED_USER_ID "
+                "en .env"
             )
 
         try:
             user_id = int(user_id_value)
+
         except ValueError as error:
             raise RuntimeError(
                 "TELEGRAM_ALLOWED_USER_ID debe "
@@ -67,11 +71,13 @@ class Settings:
 
         if not database_value:
             raise RuntimeError(
-                "CONTEXT_DATABASE_PATH "
-                "no puede estar vacío"
+                "CONTEXT_DATABASE_PATH no puede "
+                "estar vacío"
             )
 
-        database_path = Path(database_value)
+        database_path = Path(
+            database_value
+        )
 
         if not database_path.is_absolute():
             database_path = (
@@ -92,7 +98,6 @@ class Settings:
             "GIT_REPOSITORY",
             "",
         ).strip()
-
 
         ollama_base_url = os.getenv(
             "OLLAMA_BASE_URL",
@@ -125,6 +130,7 @@ class Settings:
             ollama_timeout_seconds = float(
                 timeout_value
             )
+
         except ValueError as error:
             raise RuntimeError(
                 "OLLAMA_TIMEOUT_SECONDS debe "
@@ -137,28 +143,39 @@ class Settings:
                 "ser mayor que cero"
             )
 
+        whisper_model = os.getenv(
+            "WHISPER_MODEL",
+            "small",
+        ).strip()
 
+        if not whisper_model:
+            raise RuntimeError(
+                "WHISPER_MODEL no puede "
+                "estar vacío"
+            )
 
         return cls(
             agent_name=os.getenv(
                 "AGENT_NAME",
                 "Agente Orquestador",
-            ),
+            ).strip(),
             agent_version=os.getenv(
                 "AGENT_VERSION",
                 "0.1.0",
-            ),
+            ).strip(),
             environment=os.getenv(
                 "AGENT_ENVIRONMENT",
                 "development",
-            ),
+            ).strip(),
             telegram_bot_token=token,
             telegram_allowed_user_id=user_id,
             context_database_path=(
                 database_path.resolve()
             ),
             project_name=project_name,
-            project_root_path=BASE_DIR.resolve(),
+            project_root_path=(
+                BASE_DIR.resolve()
+            ),
             git_repository=(
                 git_repository or None
             ),
@@ -167,4 +184,5 @@ class Settings:
             ollama_timeout_seconds=(
                 ollama_timeout_seconds
             ),
+            whisper_model=whisper_model,
         )

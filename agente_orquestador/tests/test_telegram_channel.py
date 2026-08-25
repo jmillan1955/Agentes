@@ -10,6 +10,7 @@ from app.context import (
     MessageRepository,
     ProjectRepository,
     SessionRepository,
+    TaskRepository,
 )
 from app.models import (
     ChannelName,
@@ -76,6 +77,9 @@ def create_channel() -> TelegramChannel:
             database
         ),
         message_repository=message_repository,
+        task_repository=TaskRepository(
+            database
+        ),
         context_query_service=(
             ContextQueryService(database)
         ),
