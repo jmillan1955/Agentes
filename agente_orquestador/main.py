@@ -27,6 +27,10 @@ from app.providers import OllamaProvider
 from app.response_generation_service import (
     ResponseGenerationService,
 )
+from app.routing import (
+    ProvisionalTaskHandler,
+    RequestClassifier,
+)
 
 logging.basicConfig(
     format=(
@@ -190,6 +194,13 @@ def main() -> None:
             response_generation_service=(
                 response_generation_service
             ),
+            request_classifier=(
+                RequestClassifier()
+            ),
+            task_handler=(
+                ProvisionalTaskHandler()
+            ),
+
         )
         channel = TelegramChannel(
             token=settings.telegram_bot_token,

@@ -61,6 +61,13 @@ class TelegramChannel:
             )
         )
         application.add_handler(
+            CommandHandler(
+                "clasificar",
+                self.handle_classify,
+            )
+        )
+
+        application.add_handler(
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND,
                 self.handle_text,
@@ -122,8 +129,6 @@ class TelegramChannel:
             "de mensajes de texto."
         )
 
-
-
     async def handle_text(
         self,
         update: Update,
@@ -144,6 +149,15 @@ class TelegramChannel:
             content_type=ContentType.COMMAND,
         )
 
+    async def handle_classify(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
 
     async def _process_update(
         self,
@@ -159,14 +173,20 @@ class TelegramChannel:
                 content_type=content_type,
             )
 
+            logger.info(
+                "Mensaje recibido: tipo=%s, id=%s",
+                content_type.value,
+                incoming.message_id,
+            )
+
             if (
                 content_type
                 == ContentType.TEXT
                 and update.message is not None
             ):
                 await update.message.reply_text(
-                    "Consulta recibida. "
-                    "Generando respuesta..."
+                    "Petición recibida. "
+                    "Procesando..."
                 )
 
                 logger.info(
@@ -180,7 +200,7 @@ class TelegramChannel:
                 )
 
                 logger.info(
-                    "Respuesta generada para %s "
+                    "Petición procesada para %s "
                     "en %s segundos",
                     incoming.message_id,
                     outgoing.metadata.get(

@@ -58,6 +58,18 @@ class FailingResponseGenerationService:
         )
 
 
+class UnexpectedResponseGenerationService:
+    def generate(
+        self,
+        project_id: int,
+        query: str,
+        current_message_id: str,
+    ):
+        raise AssertionError(
+            "Una tarea no debe enviarse "
+            "al proveedor de lenguaje"
+        )
+
 def create_orchestrator(
     database: ContextDatabase,
     context_query_service: (
@@ -445,7 +457,10 @@ def test_controls_language_provider_error() -> None:
             user_id="123456",
             conversation_id="chat-123456",
             content_type=ContentType.TEXT,
-            text="Genera una respuesta",
+            text=(
+                "¿Cuál es la capital "
+                "de Portugal?"
+            ),
         )
 
         outgoing = orchestrator.process(
@@ -470,3 +485,156 @@ def test_controls_language_provider_error() -> None:
             incoming.message_id
             not in outgoing.text
         )
+
+def test_adds_routing_decision_to_metadata() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.TEXT,
+            text=(
+                "Añade un canal de correo "
+                "al Agente Orquestador"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert (
+            outgoing.metadata["routing_kind"]
+            == "task"
+        )
+        assert (
+            outgoing.metadata[
+                "routing_confidence"
+            ]
+            == 0.90
+        )
+        assert (
+            outgoing.metadata[
+                "routing_project"
+            ]
+            == "Agente Orquestador"
+        )
+        assert not outgoing.metadata[
+            "routing_requires_clarification"
+        ]
+
+def test_classifies_request_from_command() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text=(
+                "/clasificar Añade un canal "
+                "de correo"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "CLASIFICACIÓN DE LA PETICIÓN"
+            in outgoing.text
+        )
+        assert "Tipo: task" in outgoing.text
+        assert "Confianza: 90%" in outgoing.text
+        assert (
+            "Necesita aclaración: No"
+            in outgoing.text
+        )
+
+def test_requires_request_to_classify() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/clasificar",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar una petición"
+            in outgoing.text
+        )
+
+def test_routes_task_without_calling_language_provider() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database=database,
+            response_generation_service=(
+                UnexpectedResponseGenerationService()
+            ),
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.TEXT,
+            text=(
+                "Crea el proyecto "
+                "agente_audioText"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "PETICIÓN IDENTIFICADA COMO TAREA"
+            in outgoing.text
+        )
+        assert (
+            "No se ha ejecutado ningún cambio"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata["routing_kind"]
+            == "task"
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "task_handler"
+        )
+        assert (
+            outgoing.metadata["task_status"]
+            == "pending_planning"
+        )
+        assert "model" not in outgoing.metadata
