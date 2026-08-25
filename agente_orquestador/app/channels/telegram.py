@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import tempfile
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 from telegram import Update
 from telegram.ext import (
@@ -89,6 +91,27 @@ class TelegramChannel:
         )
 
         application.add_handler(
+            CommandHandler(
+                "simple",
+                self.handle_simple,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
+                "corregir_audio",
+                self.handle_correct_audio,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
+                "confirmar_audio",
+                self.handle_confirm_audio,
+            )
+        )
+
+        application.add_handler(
             MessageHandler(
                 filters.VOICE,
                 self.handle_voice,
@@ -161,14 +184,13 @@ class TelegramChannel:
             "/contexto\n"
             "/buscar <consulta>\n"
             "/clasificar <petición>\n"
-            (
-                "/responder <tarea_id> "
-                "<aclaraciones>\n"
-            )
-            (
-                "/responder <tarea_id> "
-                "y después una nota de voz"
-            )
+            "/responder <tarea_id> "
+            "<aclaraciones>\n"
+            "/responder <tarea_id> "
+            "y después una nota de voz\n"
+            "/corregir_audio <texto correcto>\n"
+            "/simple <pregunta>\n"
+            "/confirmar_audio"
         )
 
     async def handle_text(
@@ -210,6 +232,67 @@ class TelegramChannel:
             update=update,
             content_type=ContentType.COMMAND,
         )
+
+    async def handle_simple(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        if not self.is_authorized(update):
+            return
+
+        if update.message is None:
+            return
+
+        query = " ".join(
+            context.args or []
+        ).strip()
+
+        if not query:
+            await update.message.reply_text(
+                "Debes indicar una pregunta.\n\n"
+                "Ejemplo:\n"
+                "/simple ¿Qué es una cooperativa?"
+            )
+            return
+
+        incoming = self.create_incoming(
+            update=update,
+            content_type=ContentType.TEXT,
+        )
+
+        incoming = replace(
+            incoming,
+            text=query,
+            metadata={
+                **incoming.metadata,
+                "response_style": "simple",
+                "original_command": (
+                    update.message.text
+                ),
+            },
+        )
+
+        try:
+            await self._execute_incoming(
+                update=update,
+                incoming=incoming,
+                progress_text=(
+                    "Petición recibida. "
+                    "Generando respuesta breve..."
+                ),
+            )
+
+        except Exception:
+            logger.exception(
+                "No se pudo procesar "
+                "la petición simple"
+            )
+
+            await update.message.reply_text(
+                "No se ha podido procesar "
+                "la petición."
+            )
 
     async def handle_respond(
         self,
@@ -335,11 +418,6 @@ class TelegramChannel:
                 len(text),
             )
 
-            await update.message.reply_text(
-                "Texto reconocido:\n\n"
-                f"{text}"
-            )
-
             pending_task_id = (
                 context.user_data.pop(
                     "pending_audio_task_id",
@@ -347,46 +425,30 @@ class TelegramChannel:
                 )
             )
 
-            if isinstance(
-                pending_task_id,
-                int,
-            ):
-                normalized_text = (
-                    f"/responder "
-                    f"{pending_task_id} "
-                    f"{text}"
-                )
+            context.user_data[
+                "pending_audio"
+            ] = {
+                "text": text,
+                "task_id": pending_task_id,
+                "voice_message_id": (
+                    update.message.message_id
+                ),
+                "voice_duration_seconds": (
+                    voice.duration
+                ),
+                "voice_file_unique_id": (
+                    voice.file_unique_id
+                ),
+            }
 
-                content_type = (
-                    ContentType.COMMAND
-                )
-
-                progress_text = (
-                    "Aclaración transcrita. "
-                    "Generando planificación..."
-                )
-
-            else:
-                normalized_text = text
-                content_type = ContentType.TEXT
-
-                progress_text = (
-                    "Transcripción completada. "
-                    "Procesando petición..."
-                )
-
-            incoming = (
-                self.create_incoming_from_voice(
-                    update=update,
-                    text=normalized_text,
-                    content_type=content_type,
-                )
-            )
-
-            await self._execute_incoming(
-                update=update,
-                incoming=incoming,
-                progress_text=progress_text,
+            await update.message.reply_text(
+                "Texto reconocido:\n\n"
+                f"{text}\n\n"
+                "Si necesitas corregirlo:\n"
+                "/corregir_audio "
+                "<texto correcto>\n\n"
+                "Si es correcto:\n"
+                "/confirmar_audio"
             )
 
         except Exception:
@@ -404,6 +466,156 @@ class TelegramChannel:
             audio_path.unlink(
                 missing_ok=True
             )
+
+    async def handle_correct_audio(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        if not self.is_authorized(update):
+            return
+
+        if update.message is None:
+            return
+
+        pending_audio = context.user_data.get(
+            "pending_audio"
+        )
+
+        if not isinstance(pending_audio, dict):
+            await update.message.reply_text(
+                "No hay ninguna transcripción "
+                "de audio pendiente."
+            )
+            return
+
+        corrected_text = " ".join(
+            context.args or []
+        ).strip()
+
+        if not corrected_text:
+            await update.message.reply_text(
+                "Debes indicar el texto correcto.\n\n"
+                "Ejemplo:\n"
+                "/corregir_audio Explica en una "
+                "frase corta qué es SQLite"
+            )
+            return
+
+        await self._process_pending_audio(
+            update=update,
+            context=context,
+            pending_audio=pending_audio,
+            text=corrected_text,
+            corrected=True,
+        )
+
+    async def handle_confirm_audio(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        if not self.is_authorized(update):
+            return
+
+        if update.message is None:
+            return
+
+        pending_audio = context.user_data.get(
+            "pending_audio"
+        )
+
+        if not isinstance(pending_audio, dict):
+            await update.message.reply_text(
+                "No hay ninguna transcripción "
+                "de audio pendiente."
+            )
+            return
+
+        original_text = pending_audio.get("text")
+
+        if not isinstance(original_text, str):
+            await update.message.reply_text(
+                "La transcripción pendiente "
+                "no es válida."
+            )
+            context.user_data.pop(
+                "pending_audio",
+                None,
+            )
+            return
+
+        await self._process_pending_audio(
+            update=update,
+            context=context,
+            pending_audio=pending_audio,
+            text=original_text,
+            corrected=False,
+        )
+
+    async def _process_pending_audio(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        pending_audio: dict[str, Any],
+        text: str,
+        corrected: bool,
+    ) -> None:
+        task_id = pending_audio.get("task_id")
+
+        if isinstance(task_id, int):
+            normalized_text = (
+                f"/responder {task_id} {text}"
+            )
+            content_type = ContentType.COMMAND
+            progress_text = (
+                "Aclaración confirmada. "
+                "Generando planificación..."
+            )
+
+        else:
+            normalized_text = text
+            content_type = ContentType.TEXT
+            progress_text = (
+                "Transcripción confirmada. "
+                "Procesando petición..."
+            )
+
+        incoming = (
+            self.create_incoming_from_pending_audio(
+                update=update,
+                text=normalized_text,
+                content_type=content_type,
+                pending_audio=pending_audio,
+                corrected=corrected,
+            )
+        )
+
+        try:
+            await self._execute_incoming(
+                update=update,
+                incoming=incoming,
+                progress_text=progress_text,
+            )
+
+        except Exception:
+            logger.exception(
+                "No se pudo procesar la "
+                "transcripción pendiente"
+            )
+
+            await update.message.reply_text(
+                "No se ha podido procesar el "
+                "audio. La transcripción sigue "
+                "pendiente para que puedas "
+                "intentarlo de nuevo."
+            )
+            return
+
+        context.user_data.pop(
+            "pending_audio",
+            None,
+        )
 
     async def _process_update(
         self,
@@ -608,6 +820,72 @@ class TelegramChannel:
                 ),
                 "voice_file_unique_id": (
                     voice.file_unique_id
+                ),
+            },
+        )
+
+    def create_incoming_from_pending_audio(
+        self,
+        update: Update,
+        text: str,
+        content_type: ContentType,
+        pending_audio: dict[str, Any],
+        corrected: bool,
+    ) -> IncomingMessage:
+        message = update.message
+        user = update.effective_user
+        chat = update.effective_chat
+
+        if (
+            message is None
+            or user is None
+            or chat is None
+        ):
+            raise ValueError(
+                "La actualización de Telegram "
+                "no contiene los datos necesarios"
+            )
+
+        voice_message_id = pending_audio.get(
+            "voice_message_id"
+        )
+
+        return IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id=str(user.id),
+            conversation_id=str(chat.id),
+            content_type=content_type,
+            text=text,
+            message_id=(
+                f"telegram:{chat.id}:"
+                f"{message.message_id}"
+            ),
+            metadata={
+                "telegram_message_id": (
+                    message.message_id
+                ),
+                "telegram_username": (
+                    user.username
+                ),
+                "source_content_type": "voice",
+                "source_voice_message_id": (
+                    voice_message_id
+                ),
+                "voice_duration_seconds": (
+                    pending_audio.get(
+                        "voice_duration_seconds"
+                    )
+                ),
+                "voice_file_unique_id": (
+                    pending_audio.get(
+                        "voice_file_unique_id"
+                    )
+                ),
+                "audio_transcription_corrected": (
+                    corrected
+                ),
+                "original_transcription": (
+                    pending_audio.get("text")
                 ),
             },
         )

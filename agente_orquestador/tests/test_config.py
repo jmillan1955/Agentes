@@ -21,8 +21,12 @@ def configure_required_environment(
         "http://192.168.1.131:11434",
     )
     monkeypatch.setenv(
-        "OLLAMA_MODEL",
-        "qwen3:4b",
+        "OLLAMA_GENERAL_MODEL",
+        "llama3.2:3b",
+    )
+    monkeypatch.setenv(
+        "OLLAMA_CODING_MODEL",
+        "qwen2.5-coder:3b",
     )
     monkeypatch.setenv(
         "OLLAMA_TIMEOUT_SECONDS",
@@ -42,7 +46,14 @@ def test_loads_ollama_configuration(
     assert settings.ollama_base_url == (
         "http://192.168.1.131:11434"
     )
-    assert settings.ollama_model == "qwen3:4b"
+    assert (
+        settings.ollama_general_model
+        == "llama3.2:3b"
+    )
+    assert (
+        settings.ollama_coding_model
+        == "qwen2.5-coder:3b"
+    )
     assert (
         settings.ollama_timeout_seconds
         == 300.0
@@ -64,7 +75,49 @@ def test_rejects_empty_ollama_url(
         RuntimeError,
         match=(
             "OLLAMA_BASE_URL no puede "
-            "estar vacía"
+            "estar vacÃ­a"
+        ),
+    ):
+        Settings.load()
+
+
+def test_rejects_empty_general_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+    monkeypatch.setenv(
+        "OLLAMA_GENERAL_MODEL",
+        "   ",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "OLLAMA_GENERAL_MODEL no puede "
+            "estar vacÃ­o"
+        ),
+    ):
+        Settings.load()
+
+
+def test_rejects_empty_coding_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+    monkeypatch.setenv(
+        "OLLAMA_CODING_MODEL",
+        "   ",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "OLLAMA_CODING_MODEL no puede "
+            "estar vacÃ­o"
         ),
     ):
         Settings.load()
@@ -85,7 +138,7 @@ def test_rejects_invalid_ollama_timeout(
         RuntimeError,
         match=(
             "OLLAMA_TIMEOUT_SECONDS debe "
-            "ser un número"
+            "ser un nÃºmero"
         ),
     ):
         Settings.load()

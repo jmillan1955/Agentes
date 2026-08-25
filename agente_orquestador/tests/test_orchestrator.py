@@ -32,6 +32,8 @@ class FakeResponseGenerationService:
         project_id: int,
         query: str,
         current_message_id: str,
+        include_context: bool = True,
+        response_style: str | None = None,
     ) -> GeneratedAnswer:
         return GeneratedAnswer(
             text=(
@@ -53,6 +55,8 @@ class FailingResponseGenerationService:
         project_id: int,
         query: str,
         current_message_id: str,
+        include_context: bool = True,
+        response_style: str | None = None,
     ) -> GeneratedAnswer:
         raise LanguageProviderError(
             "Proveedor no disponible"
@@ -65,6 +69,8 @@ class UnexpectedResponseGenerationService:
         project_id: int,
         query: str,
         current_message_id: str,
+        include_context: bool = True,
+        response_style: str | None = None,
     ):
         raise AssertionError(
             "Una tarea no debe enviarse "

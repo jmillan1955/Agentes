@@ -25,6 +25,8 @@ class FakeWhisperModel:
         language: str,
         beam_size: int,
         vad_filter: bool,
+        initial_prompt=None,
+        hotwords=None,
     ):
         segments = [
             SimpleNamespace(
@@ -146,6 +148,8 @@ def test_returns_empty_text_without_segments(
             language: str,
             beam_size: int,
             vad_filter: bool,
+            initial_prompt=None,
+            hotwords=None,
         ):
             return [], {}
 

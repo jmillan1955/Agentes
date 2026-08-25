@@ -254,7 +254,12 @@ class Orchestrator:
                     response_text,
                     language_metadata,
                 ) = self._generate_language_response(
-                    message
+                    message=message,
+                    include_context=(
+                        decision is not None
+                        and decision.kind
+                        == RequestKind.PROJECT_QUERY
+                    ),
                 )
 
                 metadata.update(
@@ -325,6 +330,7 @@ class Orchestrator:
     def _generate_language_response(
         self,
         message: IncomingMessage,
+        include_context: bool,
     ) -> tuple[
         str,
         dict[str, object],
@@ -338,14 +344,30 @@ class Orchestrator:
                     current_message_id=(
                         message.message_id
                     ),
-                )
-            )
+                    include_context=(
+                        include_context
+                    ),
+                    response_style=(
+                        message.metadata.get(
+                            "response_style"
+                        )
+                    ),
+                )            )
 
             metadata = {
                 "route": "language_provider",
                 "model": answer.model,
                 "elapsed_seconds": (
                     answer.elapsed_seconds
+                ),
+                "context_included": (
+                    include_context
+                ),
+                "response_style": (
+                    message.metadata.get(
+                        "response_style",
+                        "default",
+                    )
                 ),
                 "context_documents": (
                     answer.document_paths
@@ -374,6 +396,9 @@ class Orchestrator:
                 "route": "language_provider",
                 "error": type(error).__name__,
                 "error_message": str(error),
+                "context_included": (
+                    include_context
+                ),
             }
 
             return response_text, metadata
@@ -464,10 +489,9 @@ class Orchestrator:
                 "/contexto\n"
                 "/buscar <consulta>\n"
                 "/clasificar <petición>\n"
-                (
-                    "/responder <tarea_id> "
-                    "<aclaraciones>"
-                )
+                "/responder <tarea_id> "
+                "<aclaraciones>\n"
+                "/simple <pregunta>"
             ),
             {},
         )

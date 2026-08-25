@@ -25,7 +25,8 @@ class Settings:
     git_repository: str | None
 
     ollama_base_url: str
-    ollama_model: str
+    ollama_general_model: str
+    ollama_coding_model: str
     ollama_timeout_seconds: float
 
     whisper_model: str
@@ -61,7 +62,7 @@ class Settings:
         except ValueError as error:
             raise RuntimeError(
                 "TELEGRAM_ALLOWED_USER_ID debe "
-                "ser un número entero"
+                "ser un nÃºmero entero"
             ) from error
 
         database_value = os.getenv(
@@ -72,7 +73,7 @@ class Settings:
         if not database_value:
             raise RuntimeError(
                 "CONTEXT_DATABASE_PATH no puede "
-                "estar vacío"
+                "estar vacÃ­o"
             )
 
         database_path = Path(
@@ -91,7 +92,7 @@ class Settings:
 
         if not project_name:
             raise RuntimeError(
-                "PROJECT_NAME no puede estar vacío"
+                "PROJECT_NAME no puede estar vacÃ­o"
             )
 
         git_repository = os.getenv(
@@ -107,18 +108,29 @@ class Settings:
         if not ollama_base_url:
             raise RuntimeError(
                 "OLLAMA_BASE_URL no puede "
-                "estar vacía"
+                "estar vacÃ­a"
             )
 
-        ollama_model = os.getenv(
-            "OLLAMA_MODEL",
-            "qwen3:4b",
+        ollama_general_model = os.getenv(
+            "OLLAMA_GENERAL_MODEL",
+            "llama3.2:3b",
         ).strip()
 
-        if not ollama_model:
+        if not ollama_general_model:
             raise RuntimeError(
-                "OLLAMA_MODEL no puede "
-                "estar vacío"
+                "OLLAMA_GENERAL_MODEL no puede "
+                "estar vacÃ­o"
+            )
+
+        ollama_coding_model = os.getenv(
+            "OLLAMA_CODING_MODEL",
+            "qwen2.5-coder:3b",
+        ).strip()
+
+        if not ollama_coding_model:
+            raise RuntimeError(
+                "OLLAMA_CODING_MODEL no puede "
+                "estar vacÃ­o"
             )
 
         timeout_value = os.getenv(
@@ -134,7 +146,7 @@ class Settings:
         except ValueError as error:
             raise RuntimeError(
                 "OLLAMA_TIMEOUT_SECONDS debe "
-                "ser un número"
+                "ser un nÃºmero"
             ) from error
 
         if ollama_timeout_seconds <= 0:
@@ -151,7 +163,7 @@ class Settings:
         if not whisper_model:
             raise RuntimeError(
                 "WHISPER_MODEL no puede "
-                "estar vacío"
+                "estar vacÃ­o"
             )
 
         return cls(
@@ -180,7 +192,12 @@ class Settings:
                 git_repository or None
             ),
             ollama_base_url=ollama_base_url,
-            ollama_model=ollama_model,
+            ollama_general_model=(
+                ollama_general_model
+            ),
+            ollama_coding_model=(
+                ollama_coding_model
+            ),
             ollama_timeout_seconds=(
                 ollama_timeout_seconds
             ),

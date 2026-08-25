@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.context import ContextBuilder
+from app.context import (
+    ContextBlock,
+    ContextBuilder,
+)
 from app.prompt_builder import PromptBuilder
 from app.providers import LanguageProvider
 
@@ -48,25 +51,61 @@ class ResponseGenerationService:
         project_id: int,
         query: str,
         current_message_id: str,
+        include_context: bool = True,
+        response_style: str | None = None,
     ) -> GeneratedAnswer:
-        context = self._context_builder.build(
-            project_id=project_id,
-            query=query,
-            current_message_id=(
-                current_message_id
-            ),
-            maximum_characters=(
-                self._maximum_context_characters
-            ),
-            document_limit=2,
-            message_limit=3,
-        )
+        if include_context:
+            context = self._context_builder.build(
+                project_id=project_id,
+                query=query,
+                current_message_id=(
+                    current_message_id
+                ),
+                maximum_characters=(
+                    self
+                    ._maximum_context_characters
+                ),
+                document_limit=2,
+                message_limit=3,
+            )
+
+        else:
+            context = ContextBlock(
+                query=query,
+                text="",
+                document_paths=(),
+                message_ids=(),
+                total_characters=0,
+                truncated=False,
+            )
+
+        prompt_query = query
+
+        if response_style == "simple":
+            prompt_query = "\n".join(
+                [
+                    (
+                        "Responde únicamente en "
+                        "español."
+                    ),
+                    (
+                        "Utiliza como máximo dos "
+                        "frases y 60 palabras."
+                    ),
+                    (
+                        "No añadas introducciones, "
+                        "ejemplos ni conclusiones."
+                    ),
+                    "",
+                    "PREGUNTA",
+                    query,
+                ]
+            )
 
         prompt = self._prompt_builder.build(
-            query=query,
+            query=prompt_query,
             context=context,
         )
-
         response = (
             self._language_provider.generate(
                 prompt=prompt.user_prompt,

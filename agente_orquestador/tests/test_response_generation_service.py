@@ -12,6 +12,7 @@ from app.response_generation_service import (
 
 class FakeContextBuilder:
     def __init__(self) -> None:
+        self.build_calls = 0
         self.received_project_id = None
         self.received_query = None
         self.received_message_id = None
@@ -26,6 +27,7 @@ class FakeContextBuilder:
         message_limit: int = 5,
         maximum_characters: int = 6000,
     ) -> ContextBlock:
+        self.build_calls += 1
         self.received_project_id = project_id
         self.received_query = query
         self.received_message_id = (
@@ -92,7 +94,7 @@ def test_generates_answer_with_context() -> None:
     answer = service.generate(
         project_id=7,
         query=(
-            "¿Dónde se almacena "
+            "Â¿DÃ³nde se almacena "
             "el contexto?"
         ),
         current_message_id="mensaje-actual",
@@ -112,6 +114,7 @@ def test_generates_answer_with_context() -> None:
         "mensaje-anterior",
     )
 
+    assert context_builder.build_calls == 1
     assert (
         context_builder.received_project_id
         == 7
@@ -126,12 +129,44 @@ def test_generates_answer_with_context() -> None:
         provider.received_prompt
     )
     assert (
-        "¿Dónde se almacena el contexto?"
+        "Â¿DÃ³nde se almacena el contexto?"
         in provider.received_prompt
     )
     assert (
         provider.received_system_prompt
         is not None
+    )
+
+
+def test_generates_general_answer_without_context() -> None:
+    context_builder = FakeContextBuilder()
+    provider = FakeLanguageProvider()
+
+    service = ResponseGenerationService(
+        context_builder=context_builder,
+        prompt_builder=PromptBuilder(),
+        language_provider=provider,
+    )
+
+    answer = service.generate(
+        project_id=7,
+        query="Â¿QuÃ© es la gravedad?",
+        current_message_id="mensaje-actual",
+        include_context=False,
+    )
+
+    assert context_builder.build_calls == 0
+    assert answer.document_paths == ()
+    assert answer.message_ids == ()
+    assert answer.context_characters == 0
+    assert answer.context_truncated is False
+
+    assert provider.received_prompt is not None
+    assert "Â¿QuÃ© es la gravedad?" in (
+        provider.received_prompt
+    )
+    assert "El proyecto utiliza SQLite" not in (
+        provider.received_prompt
     )
 
 

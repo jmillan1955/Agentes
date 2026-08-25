@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 from app.audio import TranscriptionService
-
 from app.channels import TelegramChannel
 from app.context import (
     ContextBuilder,
@@ -185,12 +184,44 @@ def main() -> None:
             context_search_service
         )
 
-        language_provider = OllamaProvider(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_model,
-            timeout_seconds=(
-                settings.ollama_timeout_seconds
-            ),
+        general_language_provider = (
+            OllamaProvider(
+                base_url=(
+                    settings.ollama_base_url
+                ),
+                model=(
+                    settings.ollama_general_model
+                ),
+                timeout_seconds=(
+                    settings
+                    .ollama_timeout_seconds
+                ),
+            )
+        )
+
+        coding_language_provider = (
+            OllamaProvider(
+                base_url=(
+                    settings.ollama_base_url
+                ),
+                model=(
+                    settings.ollama_coding_model
+                ),
+                timeout_seconds=(
+                    settings
+                    .ollama_timeout_seconds
+                ),
+            )
+        )
+
+        logger.info(
+            "Modelo para consultas generales: %s",
+            settings.ollama_general_model,
+        )
+
+        logger.info(
+            "Modelo para planificaciÃ³n y cÃ³digo: %s",
+            settings.ollama_coding_model,
         )
 
         response_generation_service = (
@@ -198,7 +229,7 @@ def main() -> None:
                 context_builder=context_builder,
                 prompt_builder=PromptBuilder(),
                 language_provider=(
-                    language_provider
+                    general_language_provider
                 ),
             )
         )
@@ -215,7 +246,7 @@ def main() -> None:
                 PlanningPromptBuilder()
             ),
             language_provider=(
-                language_provider
+                coding_language_provider
             ),
         )
 
@@ -288,9 +319,9 @@ def main() -> None:
                 transcription_service
             ),
         )
-        
+
         logger.info(
-            "Iniciando %s versión %s",
+            "Iniciando %s versiÃ³n %s",
             settings.agent_name,
             settings.agent_version,
         )
