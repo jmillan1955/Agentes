@@ -35,13 +35,16 @@ from app.execution.workspace import (
 from app.execution.workspace_package import (
     WorkspacePackager,
 )
-
+from app.execution.query import (
+    ExecutionQueryService,
+)
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
     preparation_service: (
         ExecutionPreparationService
     )
+    query_service: ExecutionQueryService
     runner: ExecutionRunner
     sandbox_enabled: bool
 
@@ -89,6 +92,16 @@ def create_execution_runtime(
         TaskExecutionStepRepository(
             database
         )
+    )
+
+    query_service = ExecutionQueryService(
+        execution_repository=(
+            execution_repository
+        ),
+        attempt_repository=(
+            attempt_repository
+        ),
+        step_repository=step_repository,
     )
 
     filesystem_executor = (
@@ -158,6 +171,7 @@ def create_execution_runtime(
         preparation_service=(
             preparation_service
         ),
+        query_service=query_service,
         runner=runner,
         sandbox_enabled=(
             sandbox_executor is not None

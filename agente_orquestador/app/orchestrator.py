@@ -53,6 +53,10 @@ from app.tasks import (
     TaskClarificationAnalyzer,
     TaskStatus,
 )
+from app.execution.query import (
+    ExecutionQueryError,
+    ExecutionQueryService,
+)
 
 
 class Orchestrator:
@@ -93,6 +97,9 @@ class Orchestrator:
         ) = None,
         execution_preparation_service: (
             ExecutionPreparationService | None
+        ) = None,
+        execution_query_service: (
+            ExecutionQueryService | None
         ) = None,
         execution_runner: (
             ExecutionRunner | None
@@ -135,6 +142,9 @@ class Orchestrator:
         )
         self._execution_preparation_service = (
             execution_preparation_service
+        )
+        self._execution_query_service = (
+            execution_query_service
         )
         self._execution_runner = (
             execution_runner
@@ -470,12 +480,17 @@ class Orchestrator:
             if len(parts) > 1
             else ""
         )
-
+        if command == "/ver_ejecucion":
+            return (
+                self
+                ._process_view_execution_command(
+                    arguments
+                )
+            )
         if command == "/ver_plan":
             return self._process_view_plan_command(
                 arguments
             )
-
 
         if command == "/preparar_ejecucion":
             return (
@@ -561,6 +576,8 @@ class Orchestrator:
                 "/responder <tarea_id> "
                 "<aclaraciones>\n"
                 "/ver_plan <tarea_id>\n"
+                "/ver_ejecucion "
+                "<tarea_id>\n"
                 "/aprobar <tarea_id>\n"
                 "/preparar_ejecucion "
                 "<tarea_id>\n"
@@ -830,6 +847,214 @@ class Orchestrator:
                 ),
                 "already_approved": (
                     result.already_approved
+                ),
+            },
+        )
+
+    def _process_view_execution_command(
+        self,
+        arguments: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuya "
+                    "ejecucion quieres consultar."
+                    "\n\nEjemplo:\n"
+                    "/ver_ejecucion 4"
+                ),
+                {
+                    "route": (
+                        "execution_query_service"
+                    ),
+                    "execution_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/ver_ejecucion 4"
+                ),
+                {
+                    "route": (
+                        "execution_query_service"
+                    ),
+                    "execution_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/ver_ejecucion 4"
+                ),
+                {
+                    "route": (
+                        "execution_query_service"
+                    ),
+                    "execution_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if self._execution_query_service is None:
+            return (
+                (
+                    "El servicio de consulta de "
+                    "ejecuciones no esta "
+                    "disponible."
+                ),
+                {
+                    "route": (
+                        "execution_query_service"
+                    ),
+                    "execution_error": (
+                        "service_unavailable"
+                    ),
+                },
+            )
+
+        try:
+            result = (
+                self._execution_query_service
+                .get_by_task_id(task_id)
+            )
+
+        except ExecutionQueryError as error:
+            return (
+                str(error),
+                {
+                    "route": (
+                        "execution_query_service"
+                    ),
+                    "execution_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        execution = result.execution
+
+        started_at = (
+            execution.started_at
+            or "no iniciado"
+        )
+        finished_at = (
+            execution.finished_at
+            or "no finalizado"
+        )
+        last_error = (
+            execution.last_error
+            or "ninguno"
+        )
+
+        lines = [
+            f"EJECUCION #{execution.id}",
+            "",
+            f"Tarea: #{execution.task_id}",
+            f"Plan: #{execution.plan_id}",
+            (
+                "Autorizacion: "
+                f"#{execution.approval_id}"
+            ),
+            (
+                "Estado: "
+                f"{execution.status.value}"
+            ),
+            (
+                "Workspace: "
+                f"{execution.workspace_path}"
+            ),
+            (
+                "Intentos: "
+                f"{len(result.attempts)}"
+            ),
+            f"Pasos: {len(result.steps)}",
+            f"Inicio: {started_at}",
+            f"Fin: {finished_at}",
+            f"Ultimo error: {last_error}",
+        ]
+
+        if result.attempts:
+            lines.extend(
+                (
+                    "",
+                    "DETALLE DE INTENTOS",
+                )
+            )
+
+            for attempt in result.attempts:
+                lines.append(
+                    "Intento "
+                    f"{attempt.attempt_number}: "
+                    f"{attempt.status.value}"
+                )
+
+        if result.steps:
+            lines.extend(
+                (
+                    "",
+                    "DETALLE DE PASOS",
+                )
+            )
+
+            for step in result.steps:
+                lines.append(
+                    "Paso "
+                    f"{step.step_number}: "
+                    f"{step.name} "
+                    f"[{step.status.value}]"
+                )
+
+        if not result.attempts:
+            lines.extend(
+                (
+                    "",
+                    "No se ha iniciado codigo.",
+                )
+            )
+
+        return (
+            "\n".join(lines),
+            {
+                "route": (
+                    "execution_query_service"
+                ),
+                "execution_id": execution.id,
+                "task_id": execution.task_id,
+                "plan_id": execution.plan_id,
+                "approval_id": (
+                    execution.approval_id
+                ),
+                "execution_status": (
+                    execution.status.value
+                ),
+                "attempt_count": len(
+                    result.attempts
+                ),
+                "step_count": len(
+                    result.steps
                 ),
             },
         )

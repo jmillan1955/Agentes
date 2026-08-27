@@ -44,6 +44,9 @@ from app.tasks import TaskStatus
 from app.execution.service import (
     ExecutionPreparationError,
 )
+from app.execution.query import (
+    ExecutionQueryError,
+)
 class FakeResponseGenerationService:
     def generate(
         self,
@@ -102,6 +105,7 @@ def create_orchestrator(
     ) = None,
     response_generation_service=None,
     execution_preparation_service=None,
+    execution_query_service=None,
     execution_runner=None,
 ) -> Orchestrator:
     if context_query_service is None:
@@ -182,6 +186,9 @@ def create_orchestrator(
         ),
         execution_preparation_service=(
             execution_preparation_service
+        ),
+        execution_query_service=(
+            execution_query_service
         ),
         execution_runner=execution_runner,
     )
@@ -794,6 +801,9 @@ def test_approves_task_plan_with_command(
                 execution_runtime
                 .preparation_service
             ),
+            execution_query_service=(
+                execution_runtime.query_service
+            ),
             execution_runner=(
                 execution_runtime.runner
             ),
@@ -1020,6 +1030,51 @@ def test_approves_task_plan_with_command(
             stored_execution.status.value
             == "prepared"
         )
+
+        query_response = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text=(
+                    "/ver_ejecucion "
+                    f"{task.id}"
+                ),
+                message_id=(
+                    "telegram:"
+                    "chat-123456:3002"
+                ),
+            )
+        )
+
+        assert query_response.text is not None
+        assert query_response.text.startswith(
+            "EJECUCION #"
+        )
+        assert (
+            "Estado: prepared"
+            in query_response.text
+        )
+        assert (
+            "Intentos: 0"
+            in query_response.text
+        )
+        assert (
+            "No se ha iniciado codigo."
+            in query_response.text
+        )
+        assert (
+            query_response.metadata[
+                "execution_id"
+            ]
+            == stored_execution.id
+        )
+
         assert (
             not Path(
                 stored_execution
@@ -1709,6 +1764,177 @@ def test_prepare_execution_reports_service_error() -> None:
         assert (
             outgoing.metadata["task_id"]
             == 4
+        )
+
+        execution_runner.run.assert_not_called()
+
+def test_view_prepared_execution_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        query_service = Mock()
+        execution_runner = Mock()
+
+        query_service.get_by_task_id.return_value = (
+            SimpleNamespace(
+                execution=SimpleNamespace(
+                    id=5,
+                    task_id=4,
+                    plan_id=8,
+                    approval_id=2,
+                    status=SimpleNamespace(
+                        value="prepared"
+                    ),
+                    workspace_path=(
+                        "ruta/proyecto_temporal"
+                    ),
+                    attempt_count=0,
+                    started_at=None,
+                    finished_at=None,
+                    last_error=None,
+                ),
+                attempts=(),
+                steps=(),
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_query_service=(
+                query_service
+            ),
+            execution_runner=execution_runner,
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_ejecucion 4",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:510"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "EJECUCION #5"
+        )
+        assert "Tarea: #4" in outgoing.text
+        assert "Plan: #8" in outgoing.text
+        assert (
+            "Estado: prepared"
+            in outgoing.text
+        )
+        assert "Intentos: 0" in outgoing.text
+        assert "Pasos: 0" in outgoing.text
+        assert (
+            "No se ha iniciado codigo."
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "execution_query_service"
+        )
+        assert (
+            outgoing.metadata["execution_id"]
+            == 5
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == 4
+        )
+        assert (
+            outgoing.metadata[
+                "execution_status"
+            ]
+            == "prepared"
+        )
+        assert (
+            outgoing.metadata[
+                "attempt_count"
+            ]
+            == 0
+        )
+        assert (
+            outgoing.metadata["step_count"]
+            == 0
+        )
+
+        query_service.get_by_task_id.assert_called_once_with(
+            4
+        )
+        execution_runner.run.assert_not_called()
+
+
+def test_view_execution_reports_missing_execution(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        query_service = Mock()
+        execution_runner = Mock()
+
+        query_service.get_by_task_id.side_effect = (
+            ExecutionQueryError(
+                "La tarea no tiene una "
+                "ejecucion preparada"
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_query_service=(
+                query_service
+            ),
+            execution_runner=execution_runner,
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_ejecucion 99",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:511"
+                ),
+            )
+        )
+
+        assert outgoing.text == (
+            "La tarea no tiene una "
+            "ejecucion preparada"
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "execution_query_service"
+        )
+        assert (
+            outgoing.metadata[
+                "execution_error"
+            ]
+            == "ExecutionQueryError"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == 99
         )
 
         execution_runner.run.assert_not_called()

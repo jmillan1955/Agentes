@@ -13,7 +13,9 @@ from app.execution.runner import (
 from app.execution.service import (
     ExecutionPreparationService,
 )
-
+from app.execution.query import (
+    ExecutionQueryService,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -43,6 +45,10 @@ def test_creates_runtime_without_gateway(
         assert isinstance(
             runtime.preparation_service,
             ExecutionPreparationService,
+        )
+        assert isinstance(
+            runtime.query_service,
+            ExecutionQueryService,
         )
         assert isinstance(
             runtime.runner,

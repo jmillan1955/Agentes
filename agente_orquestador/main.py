@@ -362,14 +362,23 @@ def main() -> None:
             planning_formatter=(
                 PlanningFormatter()
             ),
-                        approval_service=(
+            approval_service=(
                 approval_service
             ),
             approval_formatter=(
                 ApprovalFormatter()
             ),
+            execution_preparation_service=(
+                execution_runtime
+                .preparation_service
+            ),
+            execution_query_service=(
+                execution_runtime.query_service
+            ),
+            execution_runner=(
+                execution_runtime.runner
+            ),
         )
-
         transcription_service = (
             TranscriptionService(
                 model_name=(
