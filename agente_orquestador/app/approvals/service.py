@@ -9,6 +9,9 @@ from app.approvals.models import (
 from app.context.task_approval_repository import (
     TaskApprovalRepository,
 )
+from app.context.task_execution_repository import (
+    TaskExecutionRepository,
+)
 from app.context.task_plan_repository import (
     TaskPlanRepository,
 )
@@ -60,6 +63,9 @@ class ApprovalService:
         approver_user_ids: Iterable[
             int | str
         ],
+        execution_repository: (
+            TaskExecutionRepository | None
+        ) = None,
     ) -> None:
         normalized_approvers = tuple(
             dict.fromkeys(
@@ -86,6 +92,10 @@ class ApprovalService:
         )
         self._approver_user_ids = frozenset(
             normalized_approvers
+        )
+
+        self._execution_repository = (
+            execution_repository
         )
 
     def approve(
@@ -274,12 +284,36 @@ class ApprovalService:
                 "tarea que este aprobada"
             )
 
-        cancelled_task = (
-            self._task_repository.cancel(
-                task.id
-            )
-        )
+        execution = None
 
+        if self._execution_repository is not None:
+            execution = (
+                self._execution_repository
+                .get_by_task_id(task.id)
+            )
+
+        if execution is not None:
+            self._execution_repository.cancel(
+                execution.id
+            )
+
+            cancelled_task = (
+                self._task_repository
+                .get_by_id(task.id)
+            )
+
+            if cancelled_task is None:
+                raise RuntimeError(
+                    "No se pudo recuperar "
+                    "la tarea cancelada"
+                )
+
+        else:
+            cancelled_task = (
+                self._task_repository.cancel(
+                    task.id
+                )
+            )
         return CancellationResult(
             approval=approval,
             task=cancelled_task,

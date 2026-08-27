@@ -21,6 +21,7 @@ from app.execution.runner import (
     ExecutionRunner,
 )
 from app.execution.service import (
+    ExecutionPreparationError,
     ExecutionPreparationService,
 )
 from app.models import (
@@ -476,7 +477,16 @@ class Orchestrator:
             )
 
 
-
+        if command == "/preparar_ejecucion":
+            return (
+                self
+                ._process_prepare_execution_command(
+                    arguments=arguments,
+                    message_id=message_id,
+                    user_id=user_id,
+                    channel=channel,
+                )
+            )
         if command == "/aprobar":
             return self._process_approve_command(
                 arguments=arguments,
@@ -552,6 +562,8 @@ class Orchestrator:
                 "<aclaraciones>\n"
                 "/ver_plan <tarea_id>\n"
                 "/aprobar <tarea_id>\n"
+                "/preparar_ejecucion "
+                "<tarea_id>\n"
                 "/cancelar <tarea_id>\n"
                 "/simple <pregunta>"
             ),
@@ -818,6 +830,172 @@ class Orchestrator:
                 ),
                 "already_approved": (
                     result.already_approved
+                ),
+            },
+        )
+
+    def _process_prepare_execution_command(
+        self,
+        arguments: str,
+        message_id: str,
+        user_id: str,
+        channel: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuya "
+                    "ejecucion quieres preparar."
+                    "\n\nEjemplo:\n"
+                    "/preparar_ejecucion 4"
+                ),
+                {
+                    "route": (
+                        "execution_preparation_service"
+                    ),
+                    "execution_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/preparar_ejecucion 4"
+                ),
+                {
+                    "route": (
+                        "execution_preparation_service"
+                    ),
+                    "execution_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/preparar_ejecucion 4"
+                ),
+                {
+                    "route": (
+                        "execution_preparation_service"
+                    ),
+                    "execution_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if (
+            self._execution_preparation_service
+            is None
+        ):
+            return (
+                (
+                    "El servicio de preparacion "
+                    "de ejecuciones no esta "
+                    "disponible."
+                ),
+                {
+                    "route": (
+                        "execution_preparation_service"
+                    ),
+                    "execution_error": (
+                        "service_unavailable"
+                    ),
+                },
+            )
+
+        try:
+            result = (
+                self
+                ._execution_preparation_service
+                .prepare(
+                    task_id=task_id,
+                    requested_by_user_id=(
+                        user_id
+                    ),
+                    request_message_id=(
+                        message_id
+                    ),
+                    channel=channel,
+                )
+            )
+
+        except ExecutionPreparationError as error:
+            return (
+                str(error),
+                {
+                    "route": (
+                        "execution_preparation_service"
+                    ),
+                    "execution_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        execution = result.execution
+
+        if result.already_prepared:
+            heading = (
+                "EJECUCION YA PREPARADA"
+            )
+        else:
+            heading = "EJECUCION PREPARADA"
+
+        text = (
+            f"{heading}\n\n"
+            f"Ejecucion: #{execution.id}\n"
+            f"Tarea: #{execution.task_id}\n"
+            f"Plan: #{execution.plan_id}\n"
+            "Autorizacion: "
+            f"#{execution.approval_id}\n"
+            "Estado: "
+            f"{execution.status.value}\n"
+            "Workspace: "
+            f"{execution.workspace_path}\n\n"
+            "No se ha ejecutado codigo."
+        )
+
+        return (
+            text,
+            {
+                "route": (
+                    "execution_preparation_service"
+                ),
+                "execution_id": execution.id,
+                "task_id": execution.task_id,
+                "plan_id": execution.plan_id,
+                "approval_id": (
+                    execution.approval_id
+                ),
+                "execution_status": (
+                    execution.status.value
+                ),
+                "workspace_path": (
+                    execution.workspace_path
+                ),
+                "already_prepared": (
+                    result.already_prepared
                 ),
             },
         )

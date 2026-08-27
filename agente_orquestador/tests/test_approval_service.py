@@ -12,6 +12,7 @@ from app.context import (
     TaskApprovalRepository,
     TaskPlanRepository,
     TaskRepository,
+    TaskExecutionRepository,
 )
 from app.planning import (
     PlanStatus,
@@ -19,7 +20,9 @@ from app.planning import (
 from app.tasks import (
     TaskStatus,
 )
-
+from app.execution import (
+    ExecutionStatus,
+)
 
 APPROVER_USER_ID = "8288969559"
 
@@ -147,6 +150,11 @@ def create_service(
         ),
         approval_repository=(
             TaskApprovalRepository(
+                database
+            )
+        ),
+        execution_repository=(
+            TaskExecutionRepository(
                 database
             )
         ),
@@ -535,3 +543,80 @@ def test_rejects_cancellation_without_approval() -> None:
                     APPROVER_USER_ID
                 ),
             )
+
+def test_cancels_prepared_execution_atomically(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        task, plan = create_task_and_plan(
+            database
+        )
+
+        service = create_service(database)
+
+        approved = service.approve(
+            task_id=task.id,
+            authorized_user_id=(
+                APPROVER_USER_ID
+            ),
+            authorization_message_id=(
+                "telegram:chat:"
+                "cancel-execution-1"
+            ),
+            channel="telegram",
+        )
+
+        execution_repository = (
+            TaskExecutionRepository(
+                database
+            )
+        )
+
+        execution = (
+            execution_repository.prepare(
+                task_id=task.id,
+                plan_id=plan.id,
+                approval_id=(
+                    approved.approval.id
+                ),
+                workspace_path=(
+                    "ruta/proyecto_temporal"
+                ),
+                requested_by_user_id=(
+                    APPROVER_USER_ID
+                ),
+                request_message_id=(
+                    "telegram:chat:"
+                    "prepare-execution-1"
+                ),
+                channel="telegram",
+            )
+        )
+
+        result = service.cancel(
+            task_id=task.id,
+            authorized_user_id=(
+                APPROVER_USER_ID
+            ),
+        )
+
+        stored_execution = (
+            execution_repository.get_by_id(
+                execution.id
+            )
+        )
+
+        assert (
+            result.task.status
+            == TaskStatus.CANCELLED
+        )
+        assert stored_execution is not None
+        assert (
+            stored_execution.status
+            == ExecutionStatus.CANCELLED
+        )
+        assert (
+            stored_execution.finished_at
+            is not None
+        )

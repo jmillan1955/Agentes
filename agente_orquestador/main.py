@@ -27,6 +27,7 @@ from app.context import (
     TaskPlanRepository,
     TaskRepository,
     TaskApprovalRepository,
+    TaskExecutionRepository,
 )
 from app.orchestrator import Orchestrator
 from app.execution.factory import (
@@ -284,6 +285,11 @@ def main() -> None:
             ),
             approval_repository=(
                 task_approval_repository
+            ),
+            execution_repository=(
+                TaskExecutionRepository(
+                    database
+                )
             ),
             approver_user_ids=(
                 settings
