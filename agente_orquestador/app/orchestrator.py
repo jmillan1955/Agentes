@@ -57,7 +57,10 @@ from app.execution.query import (
     ExecutionQueryError,
     ExecutionQueryService,
 )
-
+from app.execution.manifest_service import (
+    ExecutionManifestConfirmationError,
+    ExecutionManifestService,
+)
 
 class Orchestrator:
     def __init__(
@@ -100,6 +103,9 @@ class Orchestrator:
         ) = None,
         execution_query_service: (
             ExecutionQueryService | None
+        ) = None,
+        execution_manifest_service: (
+            ExecutionManifestService | None
         ) = None,
         execution_runner: (
             ExecutionRunner | None
@@ -145,6 +151,9 @@ class Orchestrator:
         )
         self._execution_query_service = (
             execution_query_service
+        )
+        self._execution_manifest_service = (
+            execution_manifest_service
         )
         self._execution_runner = (
             execution_runner
@@ -480,6 +489,23 @@ class Orchestrator:
             if len(parts) > 1
             else ""
         )
+        if command == "/ver_manifiesto":
+            return (
+                self
+                ._process_view_manifest_command(
+                    arguments
+                )
+            )
+        if command == "/confirmar_manifiesto":
+            return (
+                self
+                ._process_confirm_manifest_command(
+                    arguments=arguments,
+                    message_id=message_id,
+                    user_id=user_id,
+                    channel=channel,
+                )
+            )
         if command == "/ver_ejecucion":
             return (
                 self
@@ -586,7 +612,11 @@ class Orchestrator:
                 "<aclaraciones>\n"
                 "/ver_plan <tarea_id>\n"
                 "/ver_ejecucion "
+                "/ver_manifiesto "
                 "<tarea_id>\n"
+                "/confirmar_manifiesto "
+                "<tarea_id> <hash> CONFIRMAR "
+                "[DESTRUCTIVO]\n"
                 "/aprobar <tarea_id>\n"
                 "/preparar_ejecucion "
                 "<tarea_id>\n"
@@ -862,6 +892,449 @@ class Orchestrator:
             },
         )
 
+    def _process_view_manifest_command(
+        self,
+        arguments: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        route = (
+            "execution_manifest_service"
+        )
+
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuyo "
+                    "manifiesto quieres consultar."
+                    "\n\nEjemplo:\n"
+                    "/ver_manifiesto 4"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/ver_manifiesto 4"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/ver_manifiesto 4"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if (
+            self._execution_manifest_service
+            is None
+        ):
+            return (
+                (
+                    "El servicio de manifiestos "
+                    "no esta disponible."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "service_unavailable"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        try:
+            review = (
+                self
+                ._execution_manifest_service
+                .get_by_task_id(task_id)
+            )
+
+        except (
+            ExecutionManifestConfirmationError
+        ) as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        manifest = review.manifest
+
+        lines = [
+            f"MANIFIESTO #{manifest.id}",
+            "",
+            (
+                "Ejecucion: "
+                f"#{review.execution.id}"
+            ),
+            (
+                "Tarea: "
+                f"#{review.execution.task_id}"
+            ),
+            f"Version: {manifest.version}",
+            (
+                "Estado: "
+                f"{manifest.status.value}"
+            ),
+            (
+                "Hash: "
+                f"{manifest.manifest_hash}"
+            ),
+            (
+                "Acciones: "
+                f"{manifest.action_count}"
+            ),
+            (
+                "Acciones destructivas: "
+                f"{manifest.destructive_action_count}"
+            ),
+            "",
+            "ACCIONES",
+        ]
+
+        for action in review.actions:
+            destructive_label = (
+                " DESTRUCTIVA"
+                if action.destructive
+                else ""
+            )
+
+            lines.append(
+                "Paso "
+                f"{action.step_number}: "
+                f"{action.name}\n"
+                "  Tipo: "
+                f"{action.action_type}\n"
+                "  Ruta: "
+                f"{action.relative_path}"
+                f"{destructive_label}"
+            )
+
+        if (
+            review
+            .requires_extra_confirmation
+        ):
+            lines.extend(
+                (
+                    "",
+                    (
+                        "REQUIERE CONFIRMACION "
+                        "DESTRUCTIVA"
+                    ),
+                )
+            )
+
+        lines.extend(
+            (
+                "",
+                (
+                    "La consulta no ejecuta "
+                    "ninguna accion."
+                ),
+            )
+        )
+
+        return (
+            "\n".join(lines),
+            {
+                "route": route,
+                "execution_id": (
+                    review.execution.id
+                ),
+                "task_id": (
+                    review.execution.task_id
+                ),
+                "manifest_id": manifest.id,
+                "manifest_version": (
+                    manifest.version
+                ),
+                "manifest_status": (
+                    manifest.status.value
+                ),
+                "manifest_hash": (
+                    manifest.manifest_hash
+                ),
+                "action_count": (
+                    manifest.action_count
+                ),
+                "destructive_action_count": (
+                    manifest
+                    .destructive_action_count
+                ),
+                "requires_extra_confirmation": (
+                    review
+                    .requires_extra_confirmation
+                ),
+            },
+        )
+
+    def _process_confirm_manifest_command(
+        self,
+        arguments: str,
+        message_id: str,
+        user_id: str,
+        channel: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        route = (
+            "execution_manifest_confirmation"
+        )
+
+        parts = arguments.split()
+
+        if len(parts) < 3:
+            return (
+                (
+                    "Debes escribir CONFIRMAR "
+                    "despues del identificador "
+                    "y del hash.\n\n"
+                    "Ejemplo:\n"
+                    "/confirmar_manifiesto 4 "
+                    "<hash> CONFIRMAR"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "confirmation_required"
+                    ),
+                },
+            )
+
+        if len(parts) > 4:
+            return (
+                (
+                    "El comando contiene "
+                    "demasiados argumentos."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        manifest_hash = (
+            parts[1].strip().lower()
+        )
+
+        if (
+            len(manifest_hash) != 64
+            or any(
+                character
+                not in "0123456789abcdef"
+                for character
+                in manifest_hash
+            )
+        ):
+            return (
+                (
+                    "El hash del manifiesto debe "
+                    "tener 64 caracteres "
+                    "hexadecimales."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_manifest_hash"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        if parts[2].upper() != "CONFIRMAR":
+            return (
+                (
+                    "Debes escribir CONFIRMAR "
+                    "exactamente."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "confirmation_required"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        destructive_acknowledged = False
+
+        if len(parts) == 4:
+            if (
+                parts[3].upper()
+                != "DESTRUCTIVO"
+            ):
+                return (
+                    (
+                        "La confirmacion adicional "
+                        "debe ser DESTRUCTIVO."
+                    ),
+                    {
+                        "route": route,
+                        "manifest_error": (
+                            "invalid_destructive_ack"
+                        ),
+                        "task_id": task_id,
+                    },
+                )
+
+            destructive_acknowledged = True
+
+        if (
+            self._execution_manifest_service
+            is None
+        ):
+            return (
+                (
+                    "El servicio de manifiestos "
+                    "no esta disponible."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "service_unavailable"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        try:
+            manifest = (
+                self
+                ._execution_manifest_service
+                .confirm(
+                    task_id=task_id,
+                    expected_manifest_hash=(
+                        manifest_hash
+                    ),
+                    confirmed_by_user_id=(
+                        user_id
+                    ),
+                    confirmation_message_id=(
+                        message_id
+                    ),
+                    confirmation_channel=(
+                        channel
+                    ),
+                    destructive_acknowledged=(
+                        destructive_acknowledged
+                    ),
+                )
+            )
+
+        except (
+            ExecutionManifestConfirmationError
+        ) as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        text = (
+            "MANIFIESTO CONFIRMADO\n\n"
+            f"Manifiesto: #{manifest.id}\n"
+            "Ejecucion: "
+            f"#{manifest.execution_id}\n"
+            f"Version: {manifest.version}\n"
+            "Estado: "
+            f"{manifest.status.value}\n"
+            "Hash: "
+            f"{manifest.manifest_hash}\n"
+            "Acciones: "
+            f"{manifest.action_count}\n"
+            "Acciones destructivas: "
+            f"{manifest.destructive_action_count}"
+            "\n\n"
+            "La confirmacion no inicia "
+            "la ejecucion."
+        )
+
+        return (
+            text,
+            {
+                "route": route,
+                "task_id": task_id,
+                "execution_id": (
+                    manifest.execution_id
+                ),
+                "manifest_id": manifest.id,
+                "manifest_version": (
+                    manifest.version
+                ),
+                "manifest_status": (
+                    manifest.status.value
+                ),
+                "manifest_hash": (
+                    manifest.manifest_hash
+                ),
+                "destructive_action_count": (
+                    manifest
+                    .destructive_action_count
+                ),
+            },
+        )
     def _process_view_execution_command(
         self,
         arguments: str,

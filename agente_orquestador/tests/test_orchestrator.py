@@ -47,6 +47,9 @@ from app.execution.service import (
 from app.execution.query import (
     ExecutionQueryError,
 )
+from app.execution.manifest_service import (
+    ExecutionManifestConfirmationError,
+)
 class FakeResponseGenerationService:
     def generate(
         self,
@@ -106,6 +109,7 @@ def create_orchestrator(
     response_generation_service=None,
     execution_preparation_service=None,
     execution_query_service=None,
+    execution_manifest_service=None,
     execution_runner=None,
 ) -> Orchestrator:
     if context_query_service is None:
@@ -190,6 +194,9 @@ def create_orchestrator(
         execution_query_service=(
             execution_query_service
         ),
+        execution_manifest_service=(
+            execution_manifest_service
+        ),
         execution_runner=execution_runner,
     )
 
@@ -235,7 +242,6 @@ def test_processes_text_message() -> None:
             == 1.5
         )
 
-
 def test_persists_input_and_output() -> None:
     with ContextDatabase(
         ":memory:"
@@ -279,7 +285,6 @@ def test_persists_input_and_output() -> None:
         )
         assert messages[1].text == outgoing.text
 
-
 def test_reuses_session_for_same_conversation() -> None:
     with ContextDatabase(
         ":memory:"
@@ -321,7 +326,6 @@ def test_reuses_session_for_same_conversation() -> None:
 
         assert len(messages) == 4
 
-
 def test_reports_unsupported_content_type() -> None:
     with ContextDatabase(
         ":memory:"
@@ -357,7 +361,6 @@ def test_reports_unsupported_content_type() -> None:
             in outgoing.text
         )
 
-
 def test_returns_context_for_command() -> None:
     with ContextDatabase(
         ":memory:"
@@ -392,7 +395,6 @@ def test_returns_context_for_command() -> None:
             "Mensajes registrados:"
             in outgoing.text
         )
-
 
 def test_searches_context_for_command() -> None:
     with ContextDatabase(
@@ -481,7 +483,6 @@ def test_searches_context_for_command() -> None:
             in outgoing.text
         )
 
-
 def test_requires_search_query() -> None:
     with ContextDatabase(
         ":memory:"
@@ -507,7 +508,6 @@ def test_requires_search_query() -> None:
             "Debes indicar qué quieres buscar"
             in outgoing.text
         )
-
 
 def test_controls_language_provider_error() -> None:
     with ContextDatabase(
@@ -807,6 +807,7 @@ def test_approves_task_plan_with_command(
             execution_runner=(
                 execution_runtime.runner
             ),
+            execution_manifest_service=None,
         )
         project = ProjectRepository(
             database
@@ -1290,7 +1291,6 @@ def test_approve_command_requires_task_id() -> None:
             == "missing_task_id"
         )
 
-
 def test_approve_command_rejects_invalid_id() -> None:
     with ContextDatabase(
         ":memory:"
@@ -1322,7 +1322,6 @@ def test_approve_command_rejects_invalid_id() -> None:
             ]
             == "invalid_task_id"
         )
-
 
 def test_approve_command_rejects_non_approver() -> None:
     with ContextDatabase(
@@ -1598,7 +1597,6 @@ def test_prepare_execution_with_command() -> None:
 
         execution_runner.run.assert_not_called()
 
-
 def test_prepare_execution_requires_task_id() -> None:
     with ContextDatabase(
         ":memory:"
@@ -1715,7 +1713,6 @@ def test_prepare_execution_is_idempotent() -> None:
 
         execution_runner.run.assert_not_called()
 
-
 def test_prepare_execution_reports_service_error() -> None:
     with ContextDatabase(
         ":memory:"
@@ -1815,6 +1812,7 @@ def test_view_prepared_execution_with_command(
             execution_query_service=(
                 query_service
             ),
+            execution_manifest_service=None,
             execution_runner=execution_runner,
         )
 
@@ -1886,7 +1884,6 @@ def test_view_prepared_execution_with_command(
             4
         )
         execution_runner.run.assert_not_called()
-
 
 def test_view_execution_reports_missing_execution(
 ) -> None:
@@ -2000,3 +1997,356 @@ def test_cancel_execution_requires_task_id(
         )
 
         query_service.get_by_task_id.assert_not_called()
+
+def test_view_execution_manifest_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        manifest_service = Mock()
+        execution_runner = Mock()
+
+        manifest_service.get_by_task_id.return_value = (
+            SimpleNamespace(
+                execution=SimpleNamespace(
+                    id=5,
+                    task_id=4,
+                ),
+                manifest=SimpleNamespace(
+                    id=7,
+                    version=1,
+                    status=SimpleNamespace(
+                        value=(
+                            "pending_confirmation"
+                        )
+                    ),
+                    manifest_hash="a" * 64,
+                    action_count=2,
+                    destructive_action_count=1,
+                    is_confirmed=False,
+                ),
+                actions=(
+                    SimpleNamespace(
+                        step_number=1,
+                        name="Crear directorio",
+                        action_type=(
+                            "create_directory"
+                        ),
+                        relative_path="app",
+                        destructive=False,
+                    ),
+                    SimpleNamespace(
+                        step_number=2,
+                        name="Crear archivo",
+                        action_type=(
+                            "write_text_file"
+                        ),
+                        relative_path=(
+                            "app/main.py"
+                        ),
+                        destructive=True,
+                    ),
+                ),
+                requires_extra_confirmation=(
+                    True
+                ),
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_manifest_service=(
+                manifest_service
+            ),
+            execution_runner=execution_runner,
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_manifiesto 4",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:530"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "MANIFIESTO #7"
+        )
+        assert "Ejecucion: #5" in outgoing.text
+        assert "Tarea: #4" in outgoing.text
+        assert (
+            "Estado: pending_confirmation"
+            in outgoing.text
+        )
+        assert (
+            f"Hash: {'a' * 64}"
+            in outgoing.text
+        )
+        assert (
+            "Acciones destructivas: 1"
+            in outgoing.text
+        )
+        assert (
+            "Paso 2: Crear archivo"
+            in outgoing.text
+        )
+        assert (
+            "REQUIERE CONFIRMACION "
+            "DESTRUCTIVA"
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "execution_manifest_service"
+        )
+        assert (
+            outgoing.metadata["manifest_id"]
+            == 7
+        )
+        assert (
+            outgoing.metadata[
+                "manifest_hash"
+            ]
+            == "a" * 64
+        )
+        assert (
+            outgoing.metadata[
+                "requires_extra_confirmation"
+            ]
+            is True
+        )
+
+        execution_runner.run.assert_not_called()
+
+def test_view_manifest_reports_missing_manifest(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        manifest_service = Mock()
+        execution_runner = Mock()
+
+        manifest_service.get_by_task_id.side_effect = (
+            ExecutionManifestConfirmationError(
+                "La ejecucion no tiene un "
+                "manifiesto de acciones"
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_manifest_service=(
+                manifest_service
+            ),
+            execution_runner=execution_runner,
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_manifiesto 4",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:531"
+                ),
+            )
+        )
+
+        assert outgoing.text == (
+            "La ejecucion no tiene un "
+            "manifiesto de acciones"
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "execution_manifest_service"
+        )
+        assert (
+            outgoing.metadata[
+                "manifest_error"
+            ]
+            == (
+                "ExecutionManifestConfirmationError"
+            )
+        )
+
+        execution_runner.run.assert_not_called()
+
+def test_confirms_destructive_manifest_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        manifest_service = Mock()
+        execution_runner = Mock()
+
+        manifest_service.confirm.return_value = (
+            SimpleNamespace(
+                id=7,
+                execution_id=5,
+                version=1,
+                status=SimpleNamespace(
+                    value="confirmed"
+                ),
+                manifest_hash="a" * 64,
+                action_count=2,
+                destructive_action_count=1,
+                confirmed_at=(
+                    "2026-08-27T17:00:00Z"
+                ),
+                confirmed_by_user_id=(
+                    "123456"
+                ),
+                is_confirmed=True,
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_manifest_service=(
+                manifest_service
+            ),
+            execution_runner=execution_runner,
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text=(
+                    "/confirmar_manifiesto 4 "
+                    f"{'a' * 64} "
+                    "CONFIRMAR DESTRUCTIVO"
+                ),
+                message_id=(
+                    "telegram:"
+                    "chat-123456:540"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "MANIFIESTO CONFIRMADO"
+        )
+        assert "Manifiesto: #7" in outgoing.text
+        assert "Ejecucion: #5" in outgoing.text
+        assert (
+            "Estado: confirmed"
+            in outgoing.text
+        )
+        assert (
+            "La confirmacion no inicia "
+            "la ejecucion."
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == (
+                "execution_manifest_confirmation"
+            )
+        )
+        assert (
+            outgoing.metadata["manifest_id"]
+            == 7
+        )
+        assert (
+            outgoing.metadata[
+                "manifest_status"
+            ]
+            == "confirmed"
+        )
+
+        manifest_service.confirm.assert_called_once_with(
+            task_id=4,
+            expected_manifest_hash="a" * 64,
+            confirmed_by_user_id="123456",
+            confirmation_message_id=(
+                "telegram:chat-123456:540"
+            ),
+            confirmation_channel="telegram",
+            destructive_acknowledged=True,
+        )
+
+        execution_runner.run.assert_not_called()
+
+
+def test_confirm_manifest_requires_exact_syntax(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        manifest_service = Mock()
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_manifest_service=(
+                manifest_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text=(
+                    "/confirmar_manifiesto 4 "
+                    f"{'a' * 64}"
+                ),
+                message_id=(
+                    "telegram:"
+                    "chat-123456:541"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes escribir CONFIRMAR"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata["route"]
+            == (
+                "execution_manifest_confirmation"
+            )
+        )
+        assert (
+            outgoing.metadata[
+                "manifest_error"
+            ]
+            == "confirmation_required"
+        )
+
+        manifest_service.confirm.assert_not_called()

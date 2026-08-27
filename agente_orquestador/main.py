@@ -375,6 +375,9 @@ def main() -> None:
             execution_query_service=(
                 execution_runtime.query_service
             ),
+            execution_manifest_service=(
+                execution_runtime.manifest_service
+            ),
             execution_runner=(
                 execution_runtime.runner
             ),

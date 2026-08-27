@@ -42,7 +42,6 @@ class FakeResponseGenerationService:
             context_truncated=False,
         )
 
-
 def create_channel() -> TelegramChannel:
     database = ContextDatabase(
         ":memory:"
@@ -97,7 +96,6 @@ def create_channel() -> TelegramChannel:
         orchestrator=orchestrator,
     )
 
-
 def test_authorizes_configured_user() -> None:
     channel = create_channel()
 
@@ -109,7 +107,6 @@ def test_authorizes_configured_user() -> None:
 
     assert channel.is_authorized(update)
 
-
 def test_rejects_unconfigured_user() -> None:
     channel = create_channel()
 
@@ -120,7 +117,6 @@ def test_rejects_unconfigured_user() -> None:
     )
 
     assert not channel.is_authorized(update)
-
 
 def test_creates_incoming_from_telegram() -> None:
     channel = create_channel()
@@ -161,7 +157,6 @@ def test_creates_incoming_from_telegram() -> None:
     assert incoming.message_id == (
         "telegram:654321:42"
     )
-
 
 def test_creates_command_from_telegram() -> None:
     channel = create_channel()
@@ -210,6 +205,15 @@ def test_formats_execution_time_in_minutes() -> None:
     assert "Respuesta generada" in text
     assert "1,18 minutos" in text
     assert "qwen2.5-coder:3b" in text
+    async def handle_confirm_manifest(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
 
 def test_handle_approve_processes_command() -> None:
     channel = create_channel()
@@ -336,6 +340,62 @@ def test_cancel_execution_handler_delegates_command(
 
     asyncio.run(
         channel.handle_cancel_execution(
+            update=update,
+            context=context,
+        )
+    )
+
+    process_update.assert_awaited_once_with(
+        update=update,
+        content_type=ContentType.COMMAND,
+    )
+
+def test_view_manifest_handler_delegates_command(
+) -> None:
+    channel = create_channel()
+
+    update = SimpleNamespace()
+    context = SimpleNamespace()
+
+    process_update = AsyncMock()
+
+    channel._process_update = process_update
+
+    asyncio.run(
+        channel.handle_view_manifest(
+            update=update,
+            context=context,
+        )
+    )
+
+    process_update.assert_awaited_once_with(
+        update=update,
+        content_type=ContentType.COMMAND,
+    )
+
+    async def handle_confirm_manifest(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+def test_confirm_manifest_handler_delegates_command(
+) -> None:
+    channel = create_channel()
+
+    update = SimpleNamespace()
+    context = SimpleNamespace()
+
+    process_update = AsyncMock()
+
+    channel._process_update = process_update
+
+    asyncio.run(
+        channel.handle_confirm_manifest(
             update=update,
             context=context,
         )
