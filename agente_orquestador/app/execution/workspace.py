@@ -92,3 +92,69 @@ class WorkspacePolicy:
             )
 
         return candidate
+
+    def resolve_target(
+        self,
+        workspace_path: Path,
+        relative_path: str,
+    ) -> Path:
+        workspace = (
+            workspace_path
+            .expanduser()
+            .resolve()
+        )
+
+        if (
+            workspace == self._allowed_root
+            or not workspace.is_relative_to(
+                self._allowed_root
+            )
+        ):
+            raise WorkspaceViolationError(
+                "El workspace no es un proyecto "
+                "permitido"
+            )
+
+        relative_path = relative_path.strip()
+
+        if not relative_path:
+            raise WorkspaceViolationError(
+                "La ruta relativa no puede "
+                "estar vacia"
+            )
+
+        relative = Path(relative_path)
+
+        if relative.is_absolute():
+            raise WorkspaceViolationError(
+                "La ruta de destino no puede "
+                "ser absoluta"
+            )
+
+        candidate = (
+            workspace / relative
+        ).resolve()
+
+        if not candidate.is_relative_to(
+            workspace
+        ):
+            raise WorkspaceViolationError(
+                "La ruta de destino queda fuera "
+                "del workspace"
+            )
+
+        for protected_path in (
+            self._protected_paths
+        ):
+            if (
+                candidate == protected_path
+                or candidate.is_relative_to(
+                    protected_path
+                )
+            ):
+                raise WorkspaceViolationError(
+                    "La ruta de destino coincide "
+                    "con una ruta protegida"
+                )
+
+        return candidate

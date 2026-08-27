@@ -16,6 +16,15 @@ from app.execution.workspace import (
     WorkspacePolicy,
     WorkspaceViolationError,
 )
+from app.execution.actions import (
+    ExecutionAction,
+    ExecutionActionType,
+)
+from app.execution.filesystem_executor import (
+    FilesystemActionResult,
+    FilesystemExecutionError,
+    SafeFilesystemExecutor,
+)
 
 __all__ = [
     "ExecutionAttempt",
@@ -30,4 +39,9 @@ __all__ = [
     "TaskExecution",
     "WorkspacePolicy",
     "WorkspaceViolationError",
+    "ExecutionAction",
+    "ExecutionActionType",
+    "FilesystemActionResult",
+    "FilesystemExecutionError",
+    "SafeFilesystemExecutor",
 ]

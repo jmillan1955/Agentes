@@ -114,3 +114,71 @@ def test_accepts_existing_directory(
     assert policy.resolve(
         "proyecto_temporal"
     ) == existing_directory.resolve()
+
+def test_resolves_target_inside_workspace(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "workspaces"
+    workspace = root / "proyecto_temporal"
+
+    policy = WorkspacePolicy(
+        allowed_root=root
+    )
+
+    target = policy.resolve_target(
+        workspace_path=workspace,
+        relative_path="src/main.py",
+    )
+
+    assert target == (
+        workspace / "src" / "main.py"
+    ).resolve()
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "../fuera.txt",
+        "../../fuera.txt",
+        "src/../../fuera.txt",
+        "/ruta/absoluta.txt",
+    ),
+)
+def test_rejects_target_outside_workspace(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    root = tmp_path / "workspaces"
+    workspace = root / "proyecto_temporal"
+
+    policy = WorkspacePolicy(
+        allowed_root=root
+    )
+
+    with pytest.raises(
+        WorkspaceViolationError
+    ):
+        policy.resolve_target(
+            workspace_path=workspace,
+            relative_path=relative_path,
+        )
+
+
+def test_rejects_workspace_outside_root(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "workspaces"
+    outside = tmp_path / "otro_proyecto"
+
+    policy = WorkspacePolicy(
+        allowed_root=root
+    )
+
+    with pytest.raises(
+        WorkspaceViolationError,
+        match="workspace no es",
+    ):
+        policy.resolve_target(
+            workspace_path=outside,
+            relative_path="archivo.txt",
+        )
