@@ -17,6 +17,12 @@ from app.context import (
     TaskRepository,
     TaskPlanRepository,
 )
+from app.execution.runner import (
+    ExecutionRunner,
+)
+from app.execution.service import (
+    ExecutionPreparationService,
+)
 from app.models import (
     ContentType,
     IncomingMessage,
@@ -84,6 +90,12 @@ class Orchestrator:
         approval_formatter: (
             ApprovalFormatter | None
         ) = None,
+        execution_preparation_service: (
+            ExecutionPreparationService | None
+        ) = None,
+        execution_runner: (
+            ExecutionRunner | None
+        ) = None,
     ) -> None:
         self._project_id = project_id
         self._session_repository = session_repository
@@ -96,9 +108,6 @@ class Orchestrator:
             response_generation_service
         )
         self._task_plan_repository = task_plan_repository
-        self._task_plan_repository = (
-            task_plan_repository
-        )
         self._request_classifier = (
             request_classifier
             or RequestClassifier()
@@ -123,6 +132,14 @@ class Orchestrator:
             approval_formatter
             or ApprovalFormatter()
         )
+        self._execution_preparation_service = (
+            execution_preparation_service
+        )
+        self._execution_runner = (
+            execution_runner
+        )
+
+
     def process(
         self,
         message: IncomingMessage,

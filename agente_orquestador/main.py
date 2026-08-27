@@ -29,6 +29,9 @@ from app.context import (
     TaskApprovalRepository,
 )
 from app.orchestrator import Orchestrator
+from app.execution.factory import (
+    create_execution_runtime,
+)
 from app.planning import PlanningPromptBuilder
 from app.planning.clarification_workflow import (
     ClarificationWorkflowService,
@@ -290,6 +293,34 @@ def main() -> None:
 
         context_query_service = ContextQueryService(
             database
+        )
+        execution_runtime = (
+            create_execution_runtime(
+                database=database,
+                execution_workspace_root=(
+                    settings
+                    .execution_workspace_root
+                ),
+                protected_project_root=(
+                    settings.project_root_path
+                ),
+                sandbox_gateway_url=(
+                    settings.sandbox_gateway_url
+                ),
+                sandbox_gateway_token=(
+                    settings.sandbox_gateway_token
+                ),
+                sandbox_gateway_timeout_seconds=(
+                    settings
+                    .sandbox_gateway_timeout_seconds
+                ),
+            )
+        )
+
+        logger.info(
+            "Subsistema de ejecucion preparado; "
+            "sandbox_remoto=%s",
+            execution_runtime.sandbox_enabled,
         )
 
         orchestrator = Orchestrator(
