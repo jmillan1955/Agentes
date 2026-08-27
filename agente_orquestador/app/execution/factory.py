@@ -10,6 +10,7 @@ from app.context import (
     TaskExecutionRepository,
     TaskExecutionStepRepository,
     TaskRepository,
+    TaskExecutionManifestRepository,
 )
 from app.execution.filesystem_executor import (
     SafeFilesystemExecutor,
@@ -38,6 +39,9 @@ from app.execution.workspace_package import (
 from app.execution.query import (
     ExecutionQueryService,
 )
+from app.execution.manifest_service import (
+    ExecutionManifestService,
+)
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
@@ -45,6 +49,7 @@ class ExecutionRuntime:
         ExecutionPreparationService
     )
     query_service: ExecutionQueryService
+    manifest_service: ExecutionManifestService
     runner: ExecutionRunner
     sandbox_enabled: bool
 
@@ -94,6 +99,32 @@ def create_execution_runtime(
         )
     )
 
+    approval_repository = (
+        TaskApprovalRepository(
+            database
+        )
+    )
+
+    manifest_repository = (
+        TaskExecutionManifestRepository(
+            database
+        )
+    )
+
+    manifest_service = (
+        ExecutionManifestService(
+            execution_repository=(
+                execution_repository
+            ),
+            approval_repository=(
+                approval_repository
+            ),
+            manifest_repository=(
+                manifest_repository
+            ),
+        )
+    )
+
     query_service = ExecutionQueryService(
         execution_repository=(
             execution_repository
@@ -138,10 +169,8 @@ def create_execution_runtime(
             task_repository=TaskRepository(
                 database
             ),
-            approval_repository=(
-                TaskApprovalRepository(
-                    database
-                )
+             approval_repository=(
+                approval_repository
             ),
             execution_repository=(
                 execution_repository
@@ -172,6 +201,7 @@ def create_execution_runtime(
             preparation_service
         ),
         query_service=query_service,
+        manifest_service=manifest_service,
         runner=runner,
         sandbox_enabled=(
             sandbox_executor is not None
