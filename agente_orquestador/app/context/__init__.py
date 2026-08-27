@@ -72,6 +72,9 @@ from app.context.task_execution_attempt_repository import (
 from app.context.task_execution_step_repository import (
     TaskExecutionStepRepository,
 )
+from app.context.task_execution_manifest_repository import (
+    TaskExecutionManifestRepository,
+)
 
 __all__ = [
     "ContextBlock",
@@ -110,4 +113,5 @@ __all__ = [
     "TaskExecutionRepository",
     "TaskExecutionAttemptRepository",
     "TaskExecutionStepRepository",
+    "TaskExecutionManifestRepository",
 ]

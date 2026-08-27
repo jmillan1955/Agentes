@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 SCHEMA_SQL = """
@@ -253,6 +253,96 @@ CREATE TABLE IF NOT EXISTS task_executions (
 );
 
 CREATE TABLE IF NOT EXISTS
+task_execution_manifests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_id INTEGER NOT NULL,
+    version INTEGER NOT NULL
+        CHECK (version > 0),
+    status TEXT NOT NULL
+        DEFAULT 'draft'
+        CHECK (
+            status IN (
+                'draft',
+                'pending_confirmation',
+                'confirmed',
+                'superseded'
+            )
+        ),
+    manifest_hash TEXT NOT NULL
+        CHECK (length(manifest_hash) = 64),
+    action_count INTEGER NOT NULL
+        CHECK (action_count > 0),
+    destructive_action_count INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (
+            destructive_action_count >= 0
+            AND destructive_action_count
+                <= action_count
+        ),
+    created_at TEXT NOT NULL DEFAULT (
+        strftime(
+            '%Y-%m-%dT%H:%M:%fZ',
+            'now'
+        )
+    ),
+    confirmed_at TEXT,
+    confirmed_by_user_id TEXT,
+    confirmation_message_id TEXT,
+    confirmation_channel TEXT,
+    FOREIGN KEY (execution_id)
+        REFERENCES task_executions(id)
+        ON DELETE CASCADE,
+    UNIQUE (
+        execution_id,
+        version
+    ),
+    UNIQUE (
+        confirmation_channel,
+        confirmation_message_id
+    )
+);
+
+CREATE TABLE IF NOT EXISTS
+task_execution_manifest_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    manifest_id INTEGER NOT NULL,
+    step_number INTEGER NOT NULL
+        CHECK (step_number > 0),
+    name TEXT NOT NULL,
+    action_type TEXT NOT NULL
+        CHECK (
+            action_type IN (
+                'create_directory',
+                'write_text_file',
+                'run_pytest'
+            )
+        ),
+    relative_path TEXT NOT NULL,
+    content_text TEXT,
+    content_sha256 TEXT
+        CHECK (
+            content_sha256 IS NULL
+            OR length(content_sha256) = 64
+        ),
+    destructive INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (destructive IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT (
+        strftime(
+            '%Y-%m-%dT%H:%M:%fZ',
+            'now'
+        )
+    ),
+    FOREIGN KEY (manifest_id)
+        REFERENCES task_execution_manifests(id)
+        ON DELETE CASCADE,
+    UNIQUE (
+        manifest_id,
+        step_number
+    )
+);
+
+CREATE TABLE IF NOT EXISTS
 task_execution_attempts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     execution_id INTEGER NOT NULL,
@@ -481,6 +571,19 @@ ON task_execution_steps(
     started_at
 );
 
+CREATE INDEX IF NOT EXISTS
+idx_execution_manifests_execution
+ON task_execution_manifests(
+    execution_id,
+    version
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_manifest_actions_manifest
+ON task_execution_manifest_actions(
+    manifest_id,
+    step_number
+);
 
 CREATE INDEX IF NOT EXISTS
 idx_git_commits_project

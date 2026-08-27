@@ -26,6 +26,8 @@ EXPECTED_TABLES = {
     "task_executions",
     "task_execution_attempts",
     "task_execution_steps",
+    "task_execution_manifests",
+    "task_execution_manifest_actions",
 }
 
 
@@ -86,6 +88,32 @@ EXPECTED_ATTEMPT_COLUMNS = {
     "finished_at",
     "exit_code",
     "error_message",
+}
+EXPECTED_MANIFEST_COLUMNS = {
+    "id",
+    "execution_id",
+    "version",
+    "status",
+    "manifest_hash",
+    "action_count",
+    "destructive_action_count",
+    "created_at",
+    "confirmed_at",
+    "confirmed_by_user_id",
+    "confirmation_message_id",
+    "confirmation_channel",
+}
+EXPECTED_MANIFEST_ACTION_COLUMNS = {
+    "id",
+    "manifest_id",
+    "step_number",
+    "name",
+    "action_type",
+    "relative_path",
+    "content_text",
+    "content_sha256",
+    "destructive",
+    "created_at",
 }
 
 def get_table_names(
@@ -173,8 +201,8 @@ def test_creates_task_foreign_keys() -> None:
             "id",
         ) in references
 
-def test_uses_schema_version_seven() -> None:
-    assert SCHEMA_VERSION == 7
+def test_uses_schema_version_eight() -> None:
+    assert SCHEMA_VERSION == 8
 
 def test_creates_execution_columns() -> None:
     with ContextDatabase(
@@ -499,3 +527,106 @@ def test_creates_step_foreign_key() -> None:
             "task_execution_attempts",
             "id",
         ) in references
+
+def test_creates_execution_manifest_columns(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA table_info(
+                task_execution_manifests
+            )
+            """
+        ).fetchall()
+
+        columns = {
+            row["name"]
+            for row in rows
+        }
+
+        assert (
+            EXPECTED_MANIFEST_COLUMNS
+            <= columns
+        )
+
+
+def test_creates_manifest_action_columns(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA table_info(
+                task_execution_manifest_actions
+            )
+            """
+        ).fetchall()
+
+        columns = {
+            row["name"]
+            for row in rows
+        }
+
+        assert (
+            EXPECTED_MANIFEST_ACTION_COLUMNS
+            <= columns
+        )
+
+
+def test_creates_manifest_foreign_keys(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        manifest_rows = (
+            database.connection.execute(
+                """
+                PRAGMA foreign_key_list(
+                    task_execution_manifests
+                )
+                """
+            ).fetchall()
+        )
+
+        action_rows = (
+            database.connection.execute(
+                """
+                PRAGMA foreign_key_list(
+                    task_execution_manifest_actions
+                )
+                """
+            ).fetchall()
+        )
+
+        manifest_references = {
+            (
+                row["from"],
+                row["table"],
+                row["to"],
+            )
+            for row in manifest_rows
+        }
+
+        action_references = {
+            (
+                row["from"],
+                row["table"],
+                row["to"],
+            )
+            for row in action_rows
+        }
+
+        assert (
+            "execution_id",
+            "task_executions",
+            "id",
+        ) in manifest_references
+
+        assert (
+            "manifest_id",
+            "task_execution_manifests",
+            "id",
+        ) in action_references
