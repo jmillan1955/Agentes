@@ -1,5 +1,5 @@
 pytest
 python-dotenv
 python-telegram-bot
-httpxS
+httpx
 faster-whisper

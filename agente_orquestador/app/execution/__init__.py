@@ -25,6 +25,13 @@ from app.execution.filesystem_executor import (
     FilesystemExecutionError,
     SafeFilesystemExecutor,
 )
+from app.execution.http_sandbox_backend import (
+    HttpSandboxBackend,
+    SandboxGatewayError,
+)
+from app.execution.workspace_package import (
+    WorkspacePackager,
+)
 
 __all__ = [
     "ExecutionAttempt",
@@ -44,4 +51,7 @@ __all__ = [
     "FilesystemActionResult",
     "FilesystemExecutionError",
     "SafeFilesystemExecutor",
+    "HttpSandboxBackend",
+    "SandboxGatewayError",
+    "WorkspacePackager",
 ]

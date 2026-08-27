@@ -32,6 +32,10 @@ class Settings:
     execution_workspace_root: Path
     git_repository: str | None
 
+    sandbox_gateway_url: str | None
+    sandbox_gateway_token: str | None
+    sandbox_gateway_timeout_seconds: float
+
     ollama_base_url: str
     ollama_general_model: str
     ollama_coding_model: str
@@ -261,6 +265,67 @@ class Settings:
                 "ser mayor que cero"
             )
 
+        sandbox_gateway_url_value = os.getenv(
+            "SANDBOX_GATEWAY_URL",
+            "",
+        ).strip()
+
+        sandbox_gateway_token_value = os.getenv(
+            "SANDBOX_GATEWAY_TOKEN",
+            "",
+        ).strip()
+
+        if bool(
+            sandbox_gateway_url_value
+        ) != bool(
+            sandbox_gateway_token_value
+        ):
+            raise RuntimeError(
+                "SANDBOX_GATEWAY_URL y "
+                "SANDBOX_GATEWAY_TOKEN deben "
+                "configurarse juntos"
+            )
+
+        if (
+            sandbox_gateway_token_value
+            and len(
+                sandbox_gateway_token_value
+            ) < 32
+        ):
+            raise RuntimeError(
+                "SANDBOX_GATEWAY_TOKEN debe "
+                "tener al menos 32 caracteres"
+            )
+
+        sandbox_gateway_timeout_value = (
+            os.getenv(
+                "SANDBOX_GATEWAY_TIMEOUT_SECONDS",
+                "150",
+            ).strip()
+        )
+
+        try:
+            sandbox_gateway_timeout_seconds = (
+                float(
+                    sandbox_gateway_timeout_value
+                )
+            )
+
+        except ValueError as error:
+            raise RuntimeError(
+                "SANDBOX_GATEWAY_TIMEOUT_SECONDS "
+                "debe ser un numero positivo"
+            ) from error
+
+        if (
+            sandbox_gateway_timeout_seconds
+            <= 0
+        ):
+            raise RuntimeError(
+                "SANDBOX_GATEWAY_TIMEOUT_SECONDS "
+                "debe ser un numero positivo"
+            )
+
         whisper_model = os.getenv(
             "WHISPER_MODEL",
             "small",
@@ -304,6 +369,17 @@ class Settings:
             ),
             git_repository=(
                 git_repository or None
+            ),
+                        sandbox_gateway_url=(
+            sandbox_gateway_url_value
+                or None
+            ),
+            sandbox_gateway_token=(
+                sandbox_gateway_token_value
+                or None
+            ),
+            sandbox_gateway_timeout_seconds=(
+                sandbox_gateway_timeout_seconds
             ),
             ollama_base_url=ollama_base_url,
             ollama_general_model=(

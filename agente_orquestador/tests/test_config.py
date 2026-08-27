@@ -35,7 +35,18 @@ def configure_required_environment(
         "OLLAMA_TIMEOUT_SECONDS",
         "300",
     )
-
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_URL",
+        "",
+    )
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_TOKEN",
+        "",
+    )
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_TIMEOUT_SECONDS",
+        "150",
+    )
 def test_loads_ollama_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -344,6 +355,151 @@ def test_rejects_empty_execution_workspace_root(
         match=(
             "EXECUTION_WORKSPACE_ROOT no "
             "puede estar vacio"
+        ),
+    ):
+        Settings.load()
+
+def test_disables_sandbox_gateway_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    settings = Settings.load()
+
+    assert settings.sandbox_gateway_url is None
+    assert settings.sandbox_gateway_token is None
+    assert (
+        settings.sandbox_gateway_timeout_seconds
+        == 150.0
+    )
+
+
+def test_loads_sandbox_gateway_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_URL",
+        "http://192.168.1.102:8091",
+    )
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_TOKEN",
+        "token-seguro-de-prueba-1234567890",
+    )
+
+    settings = Settings.load()
+
+    assert settings.sandbox_gateway_url == (
+        "http://192.168.1.102:8091"
+    )
+    assert settings.sandbox_gateway_token == (
+        "token-seguro-de-prueba-1234567890"
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "gateway_url",
+        "gateway_token",
+    ),
+    (
+        (
+            "http://192.168.1.102:8091",
+            "",
+        ),
+        (
+            "",
+            "token-seguro-de-prueba-1234567890",
+        ),
+    ),
+)
+def test_requires_gateway_url_and_token_together(
+    monkeypatch: pytest.MonkeyPatch,
+    gateway_url: str,
+    gateway_token: str,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_URL",
+        gateway_url,
+    )
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_TOKEN",
+        gateway_token,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "SANDBOX_GATEWAY_URL y "
+            "SANDBOX_GATEWAY_TOKEN deben "
+            "configurarse juntos"
+        ),
+    ):
+        Settings.load()
+
+
+def test_rejects_short_sandbox_gateway_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_URL",
+        "http://192.168.1.102:8091",
+    )
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_TOKEN",
+        "token-corto",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "SANDBOX_GATEWAY_TOKEN debe "
+            "tener al menos 32 caracteres"
+        ),
+    ):
+        Settings.load()
+
+
+@pytest.mark.parametrize(
+    "timeout_value",
+    (
+        "",
+        "ciento-cincuenta",
+        "0",
+        "-1",
+    ),
+)
+def test_rejects_invalid_gateway_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+    timeout_value: str,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "SANDBOX_GATEWAY_TIMEOUT_SECONDS",
+        timeout_value,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "SANDBOX_GATEWAY_TIMEOUT_SECONDS "
+            "debe ser un numero positivo"
         ),
     ):
         Settings.load()
