@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from app.approvals.formatter import (
+    ApprovalFormatter,
+)
+from app.approvals.service import (
+    ApprovalError,
+    ApprovalService,
+)
+
 from app.context import (
     ContextBuilder,
     ContextQueryService,
@@ -7,6 +15,7 @@ from app.context import (
     MessageRepository,
     SessionRepository,
     TaskRepository,
+    TaskPlanRepository,
 )
 from app.models import (
     ContentType,
@@ -51,6 +60,9 @@ class Orchestrator:
         response_generation_service: (
             ResponseGenerationService
         ),
+        task_plan_repository: (
+            TaskPlanRepository | None
+        ) = None,
         request_classifier: (
             RequestClassifier | None
         ) = None,
@@ -66,26 +78,27 @@ class Orchestrator:
         planning_formatter: (
             PlanningFormatter | None
         ) = None,
+        approval_service: (
+            ApprovalService | None
+        ) = None,
+        approval_formatter: (
+            ApprovalFormatter | None
+        ) = None,
     ) -> None:
         self._project_id = project_id
-        self._context_builder = context_builder
+        self._session_repository = session_repository
+        self._message_repository = message_repository
+        self._task_repository = task_repository
 
-        self._session_repository = (
-            session_repository
-        )
-        self._message_repository = (
-            message_repository
-        )
-        self._task_repository = (
-            task_repository
-        )
-        self._context_query_service = (
-            context_query_service
-        )
+        self._context_query_service = context_query_service
+        self._context_builder = context_builder
         self._response_generation_service = (
             response_generation_service
         )
-
+        self._task_plan_repository = task_plan_repository
+        self._task_plan_repository = (
+            task_plan_repository
+        )
         self._request_classifier = (
             request_classifier
             or RequestClassifier()
@@ -105,7 +118,11 @@ class Orchestrator:
             planning_formatter
             or PlanningFormatter()
         )
-
+        self._approval_service = approval_service
+        self._approval_formatter = (
+            approval_formatter
+            or ApprovalFormatter()
+        )
     def process(
         self,
         message: IncomingMessage,
@@ -197,6 +214,8 @@ class Orchestrator:
                 text=message.text,
                 message_id=message.message_id,
                 session_id=session_id,
+                user_id=message.user_id,
+                channel=message.channel.value,
             )
 
             metadata.update(command_metadata)
@@ -408,6 +427,8 @@ class Orchestrator:
         text: str | None,
         message_id: str,
         session_id: int,
+        user_id: str,
+        channel: str,
     ) -> tuple[
         str,
         dict[str, object],
@@ -431,6 +452,27 @@ class Orchestrator:
             if len(parts) > 1
             else ""
         )
+
+        if command == "/ver_plan":
+            return self._process_view_plan_command(
+                arguments
+            )
+
+
+
+        if command == "/aprobar":
+            return self._process_approve_command(
+                arguments=arguments,
+                message_id=message_id,
+                user_id=user_id,
+                channel=channel,
+            )
+
+        if command == "/cancelar":
+            return self._process_cancel_command(
+                arguments=arguments,
+                user_id=user_id,
+            )
 
         if command == "/responder":
             return self._process_respond_command(
@@ -491,9 +533,403 @@ class Orchestrator:
                 "/clasificar <petición>\n"
                 "/responder <tarea_id> "
                 "<aclaraciones>\n"
+                "/ver_plan <tarea_id>\n"
+                "/aprobar <tarea_id>\n"
+                "/cancelar <tarea_id>\n"
                 "/simple <pregunta>"
             ),
             {},
+        )
+
+    def _process_view_plan_command(
+        self,
+        arguments: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuyo "
+                    "plan quieres consultar.\n\n"
+                    "Ejemplo:\n"
+                    "/ver_plan 3"
+                ),
+                {
+                    "route": "plan_query",
+                    "plan_query_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/ver_plan 3"
+                ),
+                {
+                    "route": "plan_query",
+                    "plan_query_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                ),
+                {
+                    "route": "plan_query",
+                    "plan_query_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        task = self._task_repository.get_by_id(
+            task_id
+        )
+
+        if (
+            task is None
+            or task.project_id
+            != self._project_id
+        ):
+            return (
+                f"No existe la tarea #{task_id}",
+                {
+                    "route": "plan_query",
+                    "plan_query_error": (
+                        "task_not_found"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        if self._task_plan_repository is None:
+            return (
+                (
+                    "El servicio de consulta de "
+                    "planes no esta disponible."
+                ),
+                {
+                    "route": "plan_query",
+                    "plan_query_error": (
+                        "service_unavailable"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        plan = (
+            self._task_plan_repository
+            .get_latest(task_id)
+        )
+
+        if plan is None:
+            return (
+                (
+                    f"La tarea #{task_id} "
+                    "todavia no tiene un plan."
+                ),
+                {
+                    "route": "plan_query",
+                    "plan_query_error": (
+                        "plan_not_found"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        text = self._planning_formatter.format(
+            plan=plan,
+            task=task,
+        )
+
+        return (
+            text,
+            {
+                "route": "plan_query",
+                "task_id": task.id,
+                "task_status": (
+                    task.status.value
+                ),
+                "plan_id": plan.id,
+                "plan_version": plan.version,
+                "plan_status": (
+                    plan.status.value
+                ),
+            },
+        )
+
+    def _process_approve_command(
+        self,
+        arguments: str,
+        message_id: str,
+        user_id: str,
+        channel: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea que "
+                    "quieres aprobar.\n\n"
+                    "Ejemplo:\n"
+                    "/aprobar 3"
+                ),
+                {
+                    "route": "approval_service",
+                    "approval_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/aprobar 3"
+                ),
+                {
+                    "route": "approval_service",
+                    "approval_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/aprobar 3"
+                ),
+                {
+                    "route": "approval_service",
+                    "approval_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if self._approval_service is None:
+            return (
+                (
+                    "El servicio de aprobacion "
+                    "no esta disponible."
+                ),
+                {
+                    "route": "approval_service",
+                    "approval_error": (
+                        "service_unavailable"
+                    ),
+                },
+            )
+
+        try:
+            result = (
+                self._approval_service.approve(
+                    task_id=task_id,
+                    authorized_user_id=user_id,
+                    authorization_message_id=(
+                        message_id
+                    ),
+                    channel=channel,
+                )
+            )
+
+        except ApprovalError as error:
+            return (
+                str(error),
+                {
+                    "route": "approval_service",
+                    "approval_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        text = self._approval_formatter.format(
+            result
+        )
+
+        return (
+            text,
+            {
+                "route": "approval_service",
+                "task_id": result.task.id,
+                "task_status": (
+                    result.task.status.value
+                ),
+                "plan_id": result.plan.id,
+                "plan_version": (
+                    result.plan.version
+                ),
+                "approval_id": (
+                    result.approval.id
+                ),
+                "authorized_user_id": (
+                    result.approval
+                    .authorized_user_id
+                ),
+                "already_approved": (
+                    result.already_approved
+                ),
+            },
+        )
+
+    def _process_cancel_command(
+        self,
+        arguments: str,
+        user_id: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea que "
+                    "quieres cancelar.\n\n"
+                    "Ejemplo:\n"
+                    "/cancelar 3"
+                ),
+                {
+                    "route": "cancellation_service",
+                    "cancellation_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/cancelar 3"
+                ),
+                {
+                    "route": "cancellation_service",
+                    "cancellation_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/cancelar 3"
+                ),
+                {
+                    "route": "cancellation_service",
+                    "cancellation_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if self._approval_service is None:
+            return (
+                (
+                    "El servicio de cancelacion "
+                    "no esta disponible."
+                ),
+                {
+                    "route": "cancellation_service",
+                    "cancellation_error": (
+                        "service_unavailable"
+                    ),
+                },
+            )
+
+        try:
+            result = (
+                self._approval_service.cancel(
+                    task_id=task_id,
+                    authorized_user_id=user_id,
+                )
+            )
+
+        except ApprovalError as error:
+            return (
+                str(error),
+                {
+                    "route": "cancellation_service",
+                    "cancellation_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        text = (
+            self._approval_formatter
+            .format_cancellation(result)
+        )
+
+        return (
+            text,
+            {
+                "route": "cancellation_service",
+                "task_id": result.task.id,
+                "task_status": (
+                    result.task.status.value
+                ),
+                "plan_id": result.plan.id,
+                "plan_version": (
+                    result.plan.version
+                ),
+                "plan_status": (
+                    result.plan.status.value
+                ),
+                "approval_id": (
+                    result.approval.id
+                ),
+                "cancelled_user_id": (
+                    result.cancelled_user_id
+                ),
+                "already_cancelled": (
+                    result.already_cancelled
+                ),
+            },
         )
 
     def _process_respond_command(

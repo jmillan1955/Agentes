@@ -315,3 +315,85 @@ def test_rejects_task_from_other_session() -> None:
                 "no pertenece a esta conversación"
                 in str(error)
             )
+
+def test_revises_plan_pending_approval() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        task, session = create_pending_task(
+            database
+        )
+
+        task_repository = TaskRepository(
+            database
+        )
+
+        task = (
+            task_repository
+            .return_to_planning(task.id)
+        )
+
+        task = task_repository.set_plan(
+            task_id=task.id,
+            plan=(
+                "Crear motor anterior",
+                "Crear API anterior",
+            ),
+        )
+
+        assert (
+            task.status
+            == TaskStatus.PENDING_APPROVAL
+        )
+
+        workflow = create_workflow(
+            database=database,
+            pending_decisions=(),
+        )
+
+        result = workflow.respond(
+            task_id=task.id,
+            session_id=session.id,
+            response_message_id=(
+                "telegram:123:revision"
+            ),
+            answer=(
+                "Utilizar FastAPI como backend "
+                "y desplegar con systemd y Caddy."
+            ),
+        )
+
+        assert (
+            result.task.status
+            == TaskStatus.PENDING_APPROVAL
+        )
+
+        assert result.task.plan == (
+            "Crear motor de puntuación",
+            "Crear API",
+            "Crear interfaz web",
+        )
+
+        assert (
+            result.generated_plan.plan
+            .version
+            == 1
+        )
+
+        responses = (
+            TaskClarificationResponseRepository(
+                database
+            ).list_by_task(task.id)
+        )
+
+        assert len(responses) == 1
+        assert responses[0].questions == (
+            (
+                "Cambios solicitados sobre "
+                "el plan pendiente de aprobacion"
+            ),
+        )
+        assert (
+            "FastAPI"
+            in responses[0].answer
+        )

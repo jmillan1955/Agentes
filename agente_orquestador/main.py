@@ -2,6 +2,13 @@ from __future__ import annotations
 
 import logging
 
+from app.approvals.formatter import (
+    ApprovalFormatter,
+)
+from app.approvals.service import (
+    ApprovalService,
+)
+
 from app.audio import TranscriptionService
 from app.channels import TelegramChannel
 from app.context import (
@@ -19,6 +26,7 @@ from app.context import (
     TaskClarificationResponseRepository,
     TaskPlanRepository,
     TaskRepository,
+    TaskApprovalRepository,
 )
 from app.orchestrator import Orchestrator
 from app.planning import PlanningPromptBuilder
@@ -169,6 +177,10 @@ def main() -> None:
             TaskPlanRepository(database)
         )
 
+        task_approval_repository = (
+            TaskApprovalRepository(database)
+        )
+
         context_search_service = (
             ContextSearchService(
                 document_repository=(
@@ -262,6 +274,20 @@ def main() -> None:
             )
         )
 
+        approval_service = ApprovalService(
+            task_repository=task_repository,
+            plan_repository=(
+                task_plan_repository
+            ),
+            approval_repository=(
+                task_approval_repository
+            ),
+            approver_user_ids=(
+                settings
+                .telegram_approver_user_ids
+            ),
+        )
+
         context_query_service = ContextQueryService(
             database
         )
@@ -276,6 +302,9 @@ def main() -> None:
             ),
             task_repository=(
                 task_repository
+            ),
+            task_plan_repository=(
+                task_plan_repository
             ),
             context_query_service=(
                 context_query_service
@@ -295,6 +324,12 @@ def main() -> None:
             ),
             planning_formatter=(
                 PlanningFormatter()
+            ),
+                        approval_service=(
+                approval_service
+            ),
+            approval_formatter=(
+                ApprovalFormatter()
             ),
         )
 

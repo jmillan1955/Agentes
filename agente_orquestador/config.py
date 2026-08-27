@@ -21,6 +21,10 @@ class Settings:
         int,
         ...,
     ]
+    telegram_approver_user_ids: tuple[
+        int,
+        ...,
+    ]
 
     context_database_path: Path
     project_name: str
@@ -97,6 +101,51 @@ class Settings:
                 "contener al menos un usuario"
             )
 
+        approver_ids_value = os.getenv(
+            "TELEGRAM_APPROVER_USER_IDS",
+            "",
+        ).strip()
+
+        if not approver_ids_value:
+            raise RuntimeError(
+                "Falta TELEGRAM_APPROVER_USER_IDS "
+                "en .env"
+            )
+
+        try:
+            approver_user_ids = tuple(
+                dict.fromkeys(
+                    int(value.strip())
+                    for value in (
+                        approver_ids_value.split(",")
+                    )
+                    if value.strip()
+                )
+            )
+
+        except ValueError as error:
+            raise RuntimeError(
+                "TELEGRAM_APPROVER_USER_IDS debe "
+                "contener numeros enteros "
+                "separados por comas"
+            ) from error
+
+        if not approver_user_ids:
+            raise RuntimeError(
+                "TELEGRAM_APPROVER_USER_IDS debe "
+                "contener al menos un usuario"
+            )
+
+        if not set(
+            approver_user_ids
+        ).issubset(
+            allowed_user_ids
+        ):
+            raise RuntimeError(
+                "Todos los aprobadores deben ser "
+                "usuarios autorizados"
+            )
+
         database_value = os.getenv(
             "CONTEXT_DATABASE_PATH",
             "data/context.db",
@@ -137,10 +186,15 @@ class Settings:
             "http://127.0.0.1:11434",
         ).strip()
 
+        ollama_base_url = os.getenv(
+            "OLLAMA_BASE_URL",
+            "http://127.0.0.1:11434",
+        ).strip()
+
         if not ollama_base_url:
             raise RuntimeError(
                 "OLLAMA_BASE_URL no puede "
-                "estar vacÃ­a"
+                "estar vacia"
             )
 
         ollama_general_model = os.getenv(
@@ -151,7 +205,7 @@ class Settings:
         if not ollama_general_model:
             raise RuntimeError(
                 "OLLAMA_GENERAL_MODEL no puede "
-                "estar vacÃ­o"
+                "estar vacio"
             )
 
         ollama_coding_model = os.getenv(
@@ -162,7 +216,7 @@ class Settings:
         if not ollama_coding_model:
             raise RuntimeError(
                 "OLLAMA_CODING_MODEL no puede "
-                "estar vacÃ­o"
+                "estar vacio"
             )
 
         timeout_value = os.getenv(
@@ -178,7 +232,7 @@ class Settings:
         except ValueError as error:
             raise RuntimeError(
                 "OLLAMA_TIMEOUT_SECONDS debe "
-                "ser un nÃºmero"
+                "ser un numero"
             ) from error
 
         if ollama_timeout_seconds <= 0:
@@ -195,7 +249,7 @@ class Settings:
         if not whisper_model:
             raise RuntimeError(
                 "WHISPER_MODEL no puede "
-                "estar vacÃ­o"
+                "estar vacio"
             )
 
         return cls(
@@ -214,6 +268,9 @@ class Settings:
             telegram_bot_token=token,
             telegram_allowed_user_ids=(
                 allowed_user_ids
+            ),
+            telegram_approver_user_ids=(
+                approver_user_ids
             ),
             context_database_path=(
                 database_path.resolve()

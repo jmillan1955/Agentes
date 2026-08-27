@@ -20,8 +20,10 @@ EXPECTED_TABLES = {
     "tasks",
     "task_clarification_responses",
     "task_plans",
+    "task_approvals",
     "documents",
     "git_commits",
+    "task_approvals",
 }
 
 

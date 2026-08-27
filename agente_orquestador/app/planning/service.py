@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any
-
+import re
+import unicodedata
+from app.tasks import (
+    TaskClarificationResponse,
+)
 from app.context.task_clarification_response_repository import (
     TaskClarificationResponseRepository,
 )
@@ -104,6 +108,19 @@ class PlanningService:
             language_response.text
         )
 
+        plan_data["pending_decisions"] = (
+            self._remove_answered_decisions(
+                pending_decisions=(
+                    plan_data[
+                        "pending_decisions"
+                    ]
+                ),
+                clarification_responses=(
+                    responses
+                ),
+            )
+        )
+
         plan = self._plan_repository.create(
             task_id=task.id,
             objective=plan_data["objective"],
@@ -143,6 +160,151 @@ class PlanningService:
                 language_response.elapsed_seconds
             ),
         )
+
+
+    @classmethod
+    def _remove_answered_decisions(
+        cls,
+        pending_decisions: tuple[
+            str,
+            ...,
+        ],
+        clarification_responses: tuple[
+            TaskClarificationResponse,
+            ...,
+        ],
+    ) -> tuple[str, ...]:
+        answered_questions = tuple(
+            question
+            for response
+            in clarification_responses
+            for question in response.questions
+        )
+
+        return tuple(
+            decision
+            for decision in pending_decisions
+            if not any(
+                cls._describes_same_decision(
+                    first=decision,
+                    second=question,
+                )
+                for question
+                in answered_questions
+            )
+        )
+
+    @classmethod
+    def _describes_same_decision(
+        cls,
+        first: str,
+        second: str,
+    ) -> bool:
+        normalized_first = (
+            cls._normalize_decision_text(
+                first
+            )
+        )
+        normalized_second = (
+            cls._normalize_decision_text(
+                second
+            )
+        )
+
+        if (
+            normalized_first
+            in normalized_second
+            or normalized_second
+            in normalized_first
+        ):
+            return True
+
+        first_terms = cls._meaningful_terms(
+            normalized_first
+        )
+        second_terms = cls._meaningful_terms(
+            normalized_second
+        )
+
+        if not first_terms or not second_terms:
+            return False
+
+        shared_terms = (
+            first_terms & second_terms
+        )
+
+        smallest_size = min(
+            len(first_terms),
+            len(second_terms),
+        )
+
+        return (
+            len(shared_terms) >= 2
+            and (
+                len(shared_terms)
+                / smallest_size
+            )
+            >= 0.6
+        )
+
+    @staticmethod
+    def _normalize_decision_text(
+        text: str,
+    ) -> str:
+        normalized = unicodedata.normalize(
+            "NFKD",
+            text,
+        )
+
+        without_accents = "".join(
+            character
+            for character in normalized
+            if not unicodedata.combining(
+                character
+            )
+        )
+
+        return " ".join(
+            re.findall(
+                r"[a-z0-9]+",
+                without_accents.lower(),
+            )
+        )
+
+    @staticmethod
+    def _meaningful_terms(
+        normalized_text: str,
+    ) -> set[str]:
+        ignored_terms = {
+            "a",
+            "al",
+            "como",
+            "con",
+            "de",
+            "del",
+            "el",
+            "en",
+            "la",
+            "las",
+            "los",
+            "o",
+            "para",
+            "por",
+            "que",
+            "se",
+            "un",
+            "una",
+            "y",
+        }
+
+        return {
+            term
+            for term in normalized_text.split()
+            if (
+                len(term) > 1
+                and term not in ignored_terms
+            )
+        }
 
     @classmethod
     def _parse_response(

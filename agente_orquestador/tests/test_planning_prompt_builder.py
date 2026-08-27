@@ -162,3 +162,27 @@ def test_rejects_empty_system_prompt() -> None:
         PlanningPromptBuilder(
             system_prompt="   "
         )
+
+def test_treats_answers_as_binding_decisions() -> None:
+    prompt = PlanningPromptBuilder().build(
+        task=create_task(),
+        clarification_responses=(
+            create_response(),
+        ),
+    )
+
+    assert (
+        "DECISIONES CONFIRMADAS Y VINCULANTES"
+        in prompt.user_prompt
+    )
+
+    assert (
+        "No presentes alternativas"
+        in prompt.user_prompt
+    )
+
+    assert (
+        "pending_decisions debe contener "
+        "solamente decisiones nuevas"
+        in prompt.user_prompt
+    )

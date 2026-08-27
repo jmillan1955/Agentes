@@ -60,6 +60,9 @@ from app.context.task_repository import (
 from app.context.task_plan_repository import (
     TaskPlanRepository,
 )
+from app.context.task_approval_repository import (
+    TaskApprovalRepository,
+)
 
 __all__ = [
     "ContextBlock",
@@ -92,6 +95,7 @@ __all__ = [
     "SessionRepository",
     "TaskClarificationResponseRepository",
     "TaskRepository",
+    "TaskApprovalRepository",
     "initialize_schema",
     "TaskPlanRepository",
 ]

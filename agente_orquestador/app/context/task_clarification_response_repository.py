@@ -200,13 +200,15 @@ class TaskClarificationResponseRepository:
 
         status = TaskStatus(row["status"])
 
-        if (
-            status
-            != TaskStatus.PENDING_CLARIFICATION
-        ):
+        allowed_statuses = {
+            TaskStatus.PENDING_CLARIFICATION,
+            TaskStatus.PENDING_APPROVAL,
+        }
+
+        if status not in allowed_statuses:
             raise ValueError(
-                "La tarea no está pendiente "
-                "de aclaración"
+                "La tarea no esta pendiente "
+                "de aclaracion ni de revision"
             )
 
     @staticmethod

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.planning.models import (
     PlanStatus,
     TaskPlan,
@@ -141,6 +143,18 @@ class PlanningFormatter:
                 ]
             )
 
+        elif plan.status == PlanStatus.APPROVED:
+            lines.extend(
+                [
+                    "",
+                    "El plan ya esta aprobado.",
+                    (
+                        "No se ha iniciado ninguna "
+                        "ejecucion."
+                    ),
+                ]
+            )
+
         else:
             lines.extend(
                 [
@@ -150,12 +164,11 @@ class PlanningFormatter:
                         "decisiones bloqueantes."
                     ),
                     (
-                        "La tarea está preparada "
+                        "La tarea esta preparada "
                         "para solicitar aprobación."
                     ),
                 ]
             )
-
         lines.extend(
             [
                 "",
@@ -189,6 +202,15 @@ class PlanningFormatter:
             values,
             start=1,
         ):
+            display_value = value
+
+            if numbered:
+                display_value = re.sub(
+                    r"^\s*\d+[\.\)]\s*",
+                    "",
+                    value,
+                ).strip()
+
             prefix = (
                 f"{index}."
                 if numbered
@@ -196,5 +218,5 @@ class PlanningFormatter:
             )
 
             lines.append(
-                f"{prefix} {value}"
+                f"{prefix} {display_value}"
             )

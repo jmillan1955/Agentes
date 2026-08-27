@@ -236,8 +236,7 @@ def test_rejects_task_not_waiting_for_clarification() -> None:
         with pytest.raises(
             ValueError,
             match=(
-                "no está pendiente "
-                "de aclaración"
+                "no esta pendiente"
             ),
         ):
             repository.create(

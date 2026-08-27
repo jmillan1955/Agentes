@@ -13,7 +13,11 @@ def configure_required_environment(
         "token-de-prueba",
     )
     monkeypatch.setenv(
-        "TELEGRAM_ALLOWED_USER_ID",
+        "TELEGRAM_ALLOWED_USER_IDS",
+        "123456",
+    )
+    monkeypatch.setenv(
+        "TELEGRAM_APPROVER_USER_IDS",
         "123456",
     )
     monkeypatch.setenv(
@@ -75,7 +79,7 @@ def test_rejects_empty_ollama_url(
         RuntimeError,
         match=(
             "OLLAMA_BASE_URL no puede "
-            "estar vacÃ­a"
+            "estar vacia"
         ),
     ):
         Settings.load()
@@ -96,7 +100,7 @@ def test_rejects_empty_general_model(
         RuntimeError,
         match=(
             "OLLAMA_GENERAL_MODEL no puede "
-            "estar vacÃ­o"
+            "estar vacio"
         ),
     ):
         Settings.load()
@@ -117,11 +121,10 @@ def test_rejects_empty_coding_model(
         RuntimeError,
         match=(
             "OLLAMA_CODING_MODEL no puede "
-            "estar vacÃ­o"
+            "estar vacio"
         ),
     ):
         Settings.load()
-
 
 def test_rejects_invalid_ollama_timeout(
     monkeypatch: pytest.MonkeyPatch,
@@ -138,9 +141,10 @@ def test_rejects_invalid_ollama_timeout(
         RuntimeError,
         match=(
             "OLLAMA_TIMEOUT_SECONDS debe "
-            "ser un nÃºmero"
+            "ser un numero"
         ),
     ):
+        Settings.load()
         Settings.load()
 
 def test_loads_multiple_telegram_users(
@@ -185,6 +189,126 @@ def test_rejects_invalid_telegram_user_list(
         match=(
             "TELEGRAM_ALLOWED_USER_IDS debe "
             "contener numeros enteros"
+        ),
+    ):
+        Settings.load()
+
+def test_loads_telegram_approver_users(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_ALLOWED_USER_IDS",
+        "123456,234567,345678",
+    )
+    monkeypatch.setenv(
+        "TELEGRAM_APPROVER_USER_IDS",
+        "123456,234567",
+    )
+
+    settings = Settings.load()
+
+    assert (
+        settings.telegram_approver_user_ids
+        == (
+            123456,
+            234567,
+        )
+    )
+
+
+def test_removes_duplicate_approver_users(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_ALLOWED_USER_IDS",
+        "123456,234567",
+    )
+    monkeypatch.setenv(
+        "TELEGRAM_APPROVER_USER_IDS",
+        "123456,123456",
+    )
+
+    settings = Settings.load()
+
+    assert (
+        settings.telegram_approver_user_ids
+        == (123456,)
+    )
+
+
+def test_rejects_empty_approver_user_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_APPROVER_USER_IDS",
+        "   ",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "Falta TELEGRAM_APPROVER_USER_IDS "
+            "en .env"
+        ),
+    ):
+        Settings.load()
+
+
+def test_rejects_invalid_approver_user_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_APPROVER_USER_IDS",
+        "123456,usuario-invalido",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "TELEGRAM_APPROVER_USER_IDS debe "
+            "contener numeros enteros"
+        ),
+    ):
+        Settings.load()
+
+
+def test_rejects_approver_that_is_not_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "TELEGRAM_ALLOWED_USER_IDS",
+        "123456,234567",
+    )
+    monkeypatch.setenv(
+        "TELEGRAM_APPROVER_USER_IDS",
+        "345678",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "Todos los aprobadores deben ser "
+            "usuarios autorizados"
         ),
     ):
         Settings.load()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 SCHEMA_SQL = """
@@ -124,6 +124,33 @@ task_clarification_responses (
     UNIQUE (
         task_id,
         response_message_id
+    )
+);
+
+
+CREATE TABLE IF NOT EXISTS task_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    plan_id INTEGER NOT NULL,
+    plan_version INTEGER NOT NULL
+        CHECK (plan_version > 0),
+    authorized_user_id TEXT NOT NULL,
+    authorization_message_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    ),
+    FOREIGN KEY (task_id)
+        REFERENCES tasks(id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (plan_id)
+        REFERENCES task_plans(id)
+        ON DELETE CASCADE,
+    UNIQUE (task_id),
+    UNIQUE (plan_id),
+    UNIQUE (
+        channel,
+        authorization_message_id
     )
 );
 
@@ -288,6 +315,13 @@ idx_documents_project
 ON documents(
     project_id,
     relative_path
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_task_approvals_user
+ON task_approvals(
+    authorized_user_id,
+    created_at
 );
 
 CREATE INDEX IF NOT EXISTS

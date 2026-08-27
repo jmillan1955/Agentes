@@ -332,3 +332,125 @@ def test_rejects_unknown_task() -> None:
             match="No existe la tarea",
         ):
             service.generate(999)
+
+def test_removes_answered_pending_decision() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        task = create_task(database)
+
+        clarification_repository = (
+            TaskClarificationResponseRepository(
+                database
+            )
+        )
+
+        clarification_repository.create(
+            task_id=task.id,
+            response_message_id=(
+                "mensaje-reglas-resueltas"
+            ),
+            questions=(
+                (
+                    "Reglas como punto de oro, "
+                    "numero de sets y desempate"
+                ),
+            ),
+            answer=(
+                "El partido sera al mejor de "
+                "tres sets, se utilizara punto "
+                "de oro y con 6-6 se jugara "
+                "un desempate a siete puntos."
+            ),
+        )
+
+        response_data = dict(PLAN_DATA)
+        response_data["pending_decisions"] = [
+            (
+                "Reglas como punto de oro, "
+                "numero de sets y desempate "
+                "definitivas"
+            ),
+        ]
+
+        service, _ = create_service(
+            database=database,
+            response_text=json.dumps(
+                response_data,
+                ensure_ascii=False,
+            ),
+        )
+
+        generated = service.generate(
+            task.id
+        )
+
+        assert (
+            generated.plan.pending_decisions
+            == ()
+        )
+        assert (
+            generated.plan.status
+            == PlanStatus.PENDING_APPROVAL
+        )
+
+
+def test_keeps_new_pending_decision() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        task = create_task(database)
+
+        clarification_repository = (
+            TaskClarificationResponseRepository(
+                database
+            )
+        )
+
+        clarification_repository.create(
+            task_id=task.id,
+            response_message_id=(
+                "mensaje-reglas-resueltas"
+            ),
+            questions=(
+                (
+                    "Reglas como punto de oro, "
+                    "numero de sets y desempate"
+                ),
+            ),
+            answer=(
+                "El partido sera al mejor de "
+                "tres sets y tendra punto de oro."
+            ),
+        )
+
+        response_data = dict(PLAN_DATA)
+        response_data["pending_decisions"] = [
+            (
+                "Elegir el proveedor para "
+                "el alojamiento en produccion"
+            ),
+        ]
+
+        service, _ = create_service(
+            database=database,
+            response_text=json.dumps(
+                response_data,
+                ensure_ascii=False,
+            ),
+        )
+
+        generated = service.generate(
+            task.id
+        )
+
+        assert generated.plan.pending_decisions == (
+            (
+                "Elegir el proveedor para "
+                "el alojamiento en produccion"
+            ),
+        )
+        assert (
+            generated.plan.status
+            == PlanStatus.PENDING_CLARIFICATION
+        )

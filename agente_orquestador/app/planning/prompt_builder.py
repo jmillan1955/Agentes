@@ -21,6 +21,11 @@ PLANNING_SYSTEM_PROMPT = (
     "el usuario todavía no las haya indicado. "
     "Las suposiciones importantes deben aparecer "
     "como decisiones pendientes. "
+    "Las respuestas del usuario a preguntas de "
+    "aclaracion son decisiones confirmadas, "
+    "definitivas y vinculantes. "
+    "No vuelvas a presentarlas como pendientes "
+    "ni propongas alternativas incompatibles. "
     "No escribas código y no indiques que has "
     "creado o modificado archivos. "
     "Devuelve exclusivamente un objeto JSON válido. "
@@ -114,6 +119,34 @@ class PlanningPromptBuilder:
                     ]
                 )
 
+                lines.extend(
+                    [
+                        "",
+                        (
+                            "DECISIONES CONFIRMADAS "
+                            "Y VINCULANTES"
+                        ),
+                    ]
+                )
+
+                if not responses:
+                    lines.append(
+                        "No hay decisiones confirmadas."
+                    )
+
+                else:
+                    for response in responses:
+                        for question in response.questions:
+                            lines.append(
+                                f"- Decision resuelta: "
+                                f"{question}"
+                            )
+
+                        lines.append(
+                            "- Respuesta vinculante: "
+                            f"{response.answer}"
+                        )
+
         lines.extend(
             [
                 "",
@@ -134,6 +167,30 @@ class PlanningPromptBuilder:
                 (
                     "Utiliza las aclaraciones como "
                     "información confirmada."
+                ),
+                                (
+                    "Las respuestas del usuario son "
+                    "decisiones vinculantes y tienen "
+                    "prioridad sobre cualquier "
+                    "suposicion anterior."
+                ),
+                (
+                    "No presentes alternativas para "
+                    "una decision que el usuario ya "
+                    "haya resuelto."
+                ),
+                (
+                    "No incluyas expresiones como "
+                    "'Flask o Django', 'Angular o "
+                    "React' o 'ventaja o punto de "
+                    "oro'. Elige solamente la opcion "
+                    "confirmada o una propuesta "
+                    "concreta."
+                ),
+                (
+                    "pending_decisions debe contener "
+                    "solamente decisiones nuevas que "
+                    "no hayan sido respondidas."
                 ),
                 (
                     "No vuelvas a preguntar aquello que "

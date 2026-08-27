@@ -66,20 +66,37 @@ class ClarificationWorkflowService:
                 "La tarea no pertenece a "
                 "esta conversación"
             )
+        allowed_statuses = {
+            TaskStatus.PENDING_CLARIFICATION,
+            TaskStatus.PENDING_APPROVAL,
+        }
+
+        if task.status not in allowed_statuses:
+            raise ValueError(
+                "La tarea no esta pendiente "
+                "de aclaracion ni de revision"
+            )
 
         if (
             task.status
-            != TaskStatus.PENDING_CLARIFICATION
+            == TaskStatus.PENDING_CLARIFICATION
         ):
-            raise ValueError(
-                "La tarea no está pendiente "
-                "de aclaración"
+            if not task.missing_information:
+                raise ValueError(
+                    "La tarea no tiene preguntas "
+                    "pendientes"
+                )
+
+            questions = (
+                task.missing_information
             )
 
-        if not task.missing_information:
-            raise ValueError(
-                "La tarea no tiene preguntas "
-                "pendientes"
+        else:
+            questions = (
+                (
+                    "Cambios solicitados sobre "
+                    "el plan pendiente de aprobacion"
+                ),
             )
 
         clarification = (
@@ -88,9 +105,7 @@ class ClarificationWorkflowService:
                 response_message_id=(
                     response_message_id
                 ),
-                questions=(
-                    task.missing_information
-                ),
+                questions=questions,
                 answer=answer,
             )
         )

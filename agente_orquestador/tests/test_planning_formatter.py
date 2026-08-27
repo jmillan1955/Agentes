@@ -181,3 +181,67 @@ def test_formats_plan_ready_for_approval() -> None:
         in text
     )
     assert "/responder" not in text
+
+def test_formats_approved_plan() -> None:
+    task = replace(
+        create_task(),
+        status=TaskStatus.APPROVED,
+        missing_information=(),
+        plan=(
+            "Crear motor de puntuacion",
+            "Crear API",
+        ),
+        authorized_at=(
+            "2026-08-26T12:26:41.248Z"
+        ),
+    )
+
+    plan = replace(
+        create_plan(),
+        status=PlanStatus.APPROVED,
+        pending_decisions=(),
+    )
+
+    text = PlanningFormatter().format(
+        plan=plan,
+        task=task,
+    )
+
+    assert (
+        "Estado del plan: aprobado"
+        in text
+    )
+    assert (
+        "El plan ya esta aprobado."
+        in text
+    )
+    assert (
+        "No se ha iniciado ninguna ejecucion."
+        in text
+    )
+    assert (
+        "preparada para solicitar"
+        not in text
+    )
+
+def test_avoids_duplicate_phase_numbers() -> None:
+    plan = replace(
+        create_plan(),
+        phases=(
+            "1. Definir arquitectura",
+            "2. Implementar la aplicacion",
+        ),
+    )
+
+    text = PlanningFormatter().format(
+        plan=plan,
+        task=create_task(),
+    )
+
+    assert "1. Definir arquitectura" in text
+    assert "2. Implementar la aplicacion" in text
+    assert "1. 1. Definir arquitectura" not in text
+    assert (
+        "2. 2. Implementar la aplicacion"
+        not in text
+    )

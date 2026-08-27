@@ -38,6 +38,10 @@ from app.tasks import (
             TaskStatus.IN_PROGRESS,
             TaskStatus.FAILED,
         ),
+        (
+            TaskStatus.PENDING_APPROVAL,
+            TaskStatus.PENDING_PLANNING,
+        ),
     ],
 )
 def test_accepts_valid_transition(
@@ -113,6 +117,7 @@ def test_returns_allowed_targets() -> None:
     assert targets == (
         TaskStatus.APPROVED,
         TaskStatus.CANCELLED,
+        TaskStatus.PENDING_PLANNING,
     )
 
 

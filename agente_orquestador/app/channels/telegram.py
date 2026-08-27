@@ -80,6 +80,20 @@ class TelegramChannel:
 
         application.add_handler(
             CommandHandler(
+                "aprobar",
+                self.handle_approve,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
+                "cancelar",
+                self.handle_cancel,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
                 "buscar",
                 self.handle_search,
             )
@@ -98,7 +112,12 @@ class TelegramChannel:
                 self.handle_respond,
             )
         )
-
+        application.add_handler(
+            CommandHandler(
+                "ver_plan",
+                self.handle_view_plan,
+            )
+        )
         application.add_handler(
             CommandHandler(
                 "simple",
@@ -301,6 +320,36 @@ class TelegramChannel:
                 "No se ha podido procesar "
                 "la petición."
             )
+
+    async def handle_view_plan(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_approve(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_cancel(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
 
     async def handle_respond(
         self,

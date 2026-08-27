@@ -9,7 +9,15 @@ from app.context import (
     MessageRepository,
     ProjectRepository,
     SessionRepository,
+    TaskPlanRepository,
     TaskRepository,
+    TaskApprovalRepository,
+)
+from app.approvals.formatter import (
+    ApprovalFormatter,
+)
+from app.approvals.service import (
+    ApprovalService,
 )
 from app.models import (
     Attachment,
@@ -135,8 +143,27 @@ def create_orchestrator(
         response_generation_service=(
             response_generation_service
         ),
+        task_plan_repository=(
+            TaskPlanRepository(database)
+        ),
+        approval_service=ApprovalService(
+            task_repository=TaskRepository(
+                database
+            ),
+            plan_repository=TaskPlanRepository(
+                database
+            ),
+            approval_repository=(
+                TaskApprovalRepository(
+                    database
+                )
+            ),
+            approver_user_ids=(123456,),
+        ),
+        approval_formatter=(
+            ApprovalFormatter()
+        ),
     )
-
 
 def test_processes_text_message() -> None:
     with ContextDatabase(
@@ -715,4 +742,576 @@ def test_persists_routed_task() -> None:
         assert (
             f"Identificador: #{task.id}"
             in (outgoing.text or "")
+        )
+
+def test_approves_task_plan_with_command() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        project = ProjectRepository(
+            database
+        ).save(
+            name="Agente Orquestador",
+            root_path="ruta-del-proyecto",
+        )
+
+        session = SessionRepository(
+            database
+        ).get_or_create_active(
+            project_id=project.id,
+            channel="telegram",
+            user_id="123456",
+            conversation_id="chat-123456",
+        )
+
+        task_repository = TaskRepository(
+            database
+        )
+
+        task = task_repository.create(
+            project_id=project.id,
+            session_id=session.id,
+            source_message_id=(
+                "mensaje-tarea-aprobable"
+            ),
+            title="Crear puntuacion_padel",
+            description=(
+                "Crear una aplicacion web "
+                "para controlar el marcador"
+            ),
+            target_project_name=(
+                "puntuacion_padel"
+            ),
+        )
+
+        plan = TaskPlanRepository(
+            database
+        ).create(
+            task_id=task.id,
+            objective=(
+                "Crear una aplicacion web "
+                "para controlar partidos "
+                "de padel"
+            ),
+            scope=(
+                "Definir equipos",
+                "Registrar puntos",
+            ),
+            technologies=(
+                "Frontend web",
+                "FastAPI",
+                "SQLite",
+            ),
+            interfaces=(
+                "Interfaz web movil",
+            ),
+            inputs=(
+                "Anadir punto",
+                "Corregir punto",
+            ),
+            outputs=(
+                "Marcador actualizado",
+            ),
+            data_entities=(
+                "Partido",
+                "Equipo",
+                "Jugador",
+            ),
+            business_rules=(
+                "Puntuacion reglamentaria",
+            ),
+            phases=(
+                "Crear motor de puntuacion",
+                "Crear API",
+                "Crear interfaz web",
+            ),
+            tests=(
+                "Probar juegos y sets",
+            ),
+            deployment=(
+                "Ejecucion local inicial",
+            ),
+            excluded_items=(
+                "No ejecutar sin autorizacion",
+            ),
+            completion_criteria=(
+                "Registrar un partido",
+                "Calcular el resultado",
+            ),
+        )
+
+        task_repository.set_plan(
+            task_id=task.id,
+            plan=plan.phases,
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text=f"/aprobar {task.id}",
+            message_id=(
+                "telegram:chat-123456:300"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "PLAN APROBADO"
+        )
+        assert (
+            f"Tarea: #{task.id}"
+            in outgoing.text
+        )
+        assert (
+            "Proyecto: puntuacion_padel"
+            in outgoing.text
+        )
+        assert (
+            "No se ha creado ni modificado "
+            "codigo del proyecto."
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "approval_service"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == task.id
+        )
+        assert (
+            outgoing.metadata["plan_id"]
+            == plan.id
+        )
+        assert (
+            outgoing.metadata["plan_version"]
+            == plan.version
+        )
+        assert (
+            outgoing.metadata[
+                "already_approved"
+            ]
+            is False
+        )
+
+        stored_task = task_repository.get_by_id(
+            task.id
+        )
+
+        assert stored_task is not None
+        assert (
+            stored_task.status
+            == TaskStatus.APPROVED
+        )
+        assert (
+            stored_task.status
+            == TaskStatus.APPROVED
+        )
+        cancellation = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text=f"/cancelar {task.id}",
+            message_id=(
+                "telegram:chat-123456:301"
+            ),
+        )
+
+        cancellation_response = (
+            orchestrator.process(
+                cancellation
+            )
+        )
+
+        assert (
+            cancellation_response.text
+            is not None
+        )
+        assert (
+            cancellation_response.text
+            .startswith(
+                "TAREA APROBADA CANCELADA"
+            )
+        )
+        assert (
+            f"Tarea: #{task.id}"
+            in cancellation_response.text
+        )
+        assert (
+            "Plan aprobado conservado: "
+            f"version {plan.version}"
+            in cancellation_response.text
+        )
+        assert (
+            "La autorizacion se conserva "
+            "como historial."
+            in cancellation_response.text
+        )
+        assert (
+            "La tarea no podra iniciar "
+            "su ejecucion."
+            in cancellation_response.text
+        )
+
+        assert (
+            cancellation_response.metadata[
+                "route"
+            ]
+            == "cancellation_service"
+        )
+        assert (
+            cancellation_response.metadata[
+                "task_id"
+            ]
+            == task.id
+        )
+        assert (
+            cancellation_response.metadata[
+                "task_status"
+            ]
+            == TaskStatus.CANCELLED.value
+        )
+        assert (
+            cancellation_response.metadata[
+                "plan_id"
+            ]
+            == plan.id
+        )
+        assert (
+            cancellation_response.metadata[
+                "plan_status"
+            ]
+            == "approved"
+        )
+        assert (
+            cancellation_response.metadata[
+                "already_cancelled"
+            ]
+            is False
+        )
+
+        cancelled_task = (
+            task_repository.get_by_id(
+                task.id
+            )
+        )
+
+        assert cancelled_task is not None
+        assert (
+            cancelled_task.status
+            == TaskStatus.CANCELLED
+        )
+
+        stored_plan = (
+            TaskPlanRepository(database)
+            .get_by_id(plan.id)
+        )
+
+        assert stored_plan is not None
+        assert (
+            stored_plan.status.value
+            == "approved"
+        )
+        repeated_response = (
+            orchestrator.process(
+                IncomingMessage(
+                    channel=(
+                        ChannelName.TELEGRAM
+                    ),
+                    user_id="123456",
+                    conversation_id=(
+                        "chat-123456"
+                    ),
+                    content_type=(
+                        ContentType.COMMAND
+                    ),
+                    text=(
+                        f"/cancelar {task.id}"
+                    ),
+                    message_id=(
+                        "telegram:"
+                        "chat-123456:302"
+                    ),
+                )
+            )
+        )
+
+        assert (
+            repeated_response.text
+            is not None
+        )
+        assert (
+            repeated_response.text.startswith(
+                "TAREA YA CANCELADA"
+            )
+        )
+        assert (
+            repeated_response.metadata[
+                "already_cancelled"
+            ]
+            is True
+        )
+        assert (
+            repeated_response.metadata[
+                "task_status"
+            ]
+            == TaskStatus.CANCELLED.value
+        )
+
+def test_approve_command_requires_task_id() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/aprobar",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar la tarea"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata[
+                "approval_error"
+            ]
+            == "missing_task_id"
+        )
+
+
+def test_approve_command_rejects_invalid_id() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/aprobar tarea",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "debe ser un numero entero"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata[
+                "approval_error"
+            ]
+            == "invalid_task_id"
+        )
+
+
+def test_approve_command_rejects_non_approver() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="177448510",
+            conversation_id="chat-177448510",
+            content_type=ContentType.COMMAND,
+            text="/aprobar 999",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "No tienes permiso"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata[
+                "approval_error"
+            ]
+            == "ApprovalPermissionError"
+        )
+
+def test_shows_latest_task_plan() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        project = ProjectRepository(
+            database
+        ).save(
+            name="Agente Orquestador",
+            root_path="ruta-del-proyecto",
+        )
+
+        session = SessionRepository(
+            database
+        ).get_or_create_active(
+            project_id=project.id,
+            channel="telegram",
+            user_id="123456",
+            conversation_id="chat-123456",
+        )
+
+        task = TaskRepository(
+            database
+        ).create(
+            project_id=project.id,
+            session_id=session.id,
+            source_message_id=(
+                "mensaje-ver-plan"
+            ),
+            title="Crear proyecto",
+            description="Crear proyecto",
+            target_project_name=(
+                "proyecto_prueba"
+            ),
+        )
+
+        plan = TaskPlanRepository(
+            database
+        ).create(
+            task_id=task.id,
+            objective=(
+                "Crear el proyecto de prueba"
+            ),
+            scope=(
+                "Construir la primera version",
+            ),
+            technologies=(
+                "FastAPI",
+                "SQLite",
+            ),
+            phases=(
+                "Definir arquitectura",
+                "Implementar la aplicacion",
+            ),
+            completion_criteria=(
+                "Superar todas las pruebas",
+            ),
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text=f"/ver_plan {task.id}",
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "PLAN PROPUESTO"
+            in outgoing.text
+        )
+        assert (
+            f"Tarea: #{task.id}"
+            in outgoing.text
+        )
+        assert (
+            "Proyecto: proyecto_prueba"
+            in outgoing.text
+        )
+        assert (
+            "Crear el proyecto de prueba"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "plan_query"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == task.id
+        )
+        assert (
+            outgoing.metadata["plan_id"]
+            == plan.id
+        )
+        assert (
+            outgoing.metadata["plan_version"]
+            == plan.version
+        )
+
+def test_cancel_command_requires_task_id() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/cancelar",
+            message_id=(
+                "telegram:chat-123456:400"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar la tarea que "
+            "quieres cancelar."
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "cancellation_service"
+        )
+        assert (
+            outgoing.metadata[
+                "cancellation_error"
+            ]
+            == "missing_task_id"
         )

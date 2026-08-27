@@ -25,6 +25,7 @@ class TaskStateMachine:
         TaskStatus.PENDING_APPROVAL: {
             TaskStatus.APPROVED,
             TaskStatus.CANCELLED,
+            TaskStatus.PENDING_PLANNING,
         },
         TaskStatus.APPROVED: {
             TaskStatus.IN_PROGRESS,
