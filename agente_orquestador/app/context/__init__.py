@@ -63,6 +63,15 @@ from app.context.task_plan_repository import (
 from app.context.task_approval_repository import (
     TaskApprovalRepository,
 )
+from app.context.task_execution_repository import (
+    TaskExecutionRepository,
+)
+from app.context.task_execution_attempt_repository import (
+    TaskExecutionAttemptRepository,
+)
+from app.context.task_execution_step_repository import (
+    TaskExecutionStepRepository,
+)
 
 __all__ = [
     "ContextBlock",
@@ -98,4 +107,7 @@ __all__ = [
     "TaskApprovalRepository",
     "initialize_schema",
     "TaskPlanRepository",
+    "TaskExecutionRepository",
+    "TaskExecutionAttemptRepository",
+    "TaskExecutionStepRepository",
 ]

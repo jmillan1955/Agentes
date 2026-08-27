@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 SCHEMA_SQL = """
@@ -205,6 +205,121 @@ CREATE TABLE IF NOT EXISTS task_plans (
     )
 );
 
+CREATE TABLE IF NOT EXISTS task_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    plan_id INTEGER NOT NULL,
+    approval_id INTEGER NOT NULL,
+    status TEXT NOT NULL
+        DEFAULT 'prepared'
+        CHECK (
+            status IN (
+                'prepared',
+                'running',
+                'completed',
+                'failed',
+                'interrupted',
+                'cancelled'
+            )
+        ),
+    workspace_path TEXT NOT NULL,
+    requested_by_user_id TEXT NOT NULL,
+    request_message_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    attempt_count INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (attempt_count >= 0),
+    created_at TEXT NOT NULL DEFAULT (
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    ),
+    started_at TEXT,
+    finished_at TEXT,
+    last_error TEXT,
+    FOREIGN KEY (task_id)
+        REFERENCES tasks(id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (plan_id)
+        REFERENCES task_plans(id)
+        ON DELETE RESTRICT,
+    FOREIGN KEY (approval_id)
+        REFERENCES task_approvals(id)
+        ON DELETE RESTRICT,
+    UNIQUE (task_id),
+    UNIQUE (approval_id),
+    UNIQUE (
+        channel,
+        request_message_id
+    )
+);
+
+CREATE TABLE IF NOT EXISTS
+task_execution_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_id INTEGER NOT NULL,
+    attempt_number INTEGER NOT NULL
+        CHECK (attempt_number > 0),
+    status TEXT NOT NULL
+        DEFAULT 'running'
+        CHECK (
+            status IN (
+                'running',
+                'completed',
+                'failed',
+                'interrupted',
+                'cancelled'
+            )
+        ),
+    started_at TEXT NOT NULL DEFAULT (
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    ),
+    finished_at TEXT,
+    exit_code INTEGER,
+    error_message TEXT,
+    FOREIGN KEY (execution_id)
+        REFERENCES task_executions(id)
+        ON DELETE CASCADE,
+    UNIQUE (
+        execution_id,
+        attempt_number
+    )
+);
+
+CREATE TABLE IF NOT EXISTS
+task_execution_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attempt_id INTEGER NOT NULL,
+    step_number INTEGER NOT NULL
+        CHECK (step_number > 0),
+    name TEXT NOT NULL,
+    action_type TEXT NOT NULL,
+    status TEXT NOT NULL
+        DEFAULT 'pending'
+        CHECK (
+            status IN (
+                'pending',
+                'running',
+                'completed',
+                'failed',
+                'skipped',
+                'cancelled'
+            )
+        ),
+    started_at TEXT,
+    finished_at TEXT,
+    exit_code INTEGER,
+    stdout_text TEXT,
+    stderr_text TEXT,
+    error_message TEXT,
+    FOREIGN KEY (attempt_id)
+        REFERENCES task_execution_attempts(id)
+        ON DELETE CASCADE,
+    UNIQUE (
+        attempt_id,
+        step_number
+    )
+);
+
+
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
@@ -323,6 +438,49 @@ ON task_approvals(
     authorized_user_id,
     created_at
 );
+
+CREATE INDEX IF NOT EXISTS
+idx_task_executions_status
+ON task_executions(
+    status,
+    created_at
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_task_executions_plan
+ON task_executions(
+    plan_id,
+    created_at
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_execution_attempts_execution
+ON task_execution_attempts(
+    execution_id,
+    attempt_number
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_execution_attempts_status
+ON task_execution_attempts(
+    status,
+    started_at
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_execution_steps_attempt
+ON task_execution_steps(
+    attempt_id,
+    step_number
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_execution_steps_status
+ON task_execution_steps(
+    status,
+    started_at
+);
+
 
 CREATE INDEX IF NOT EXISTS
 idx_git_commits_project

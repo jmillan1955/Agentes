@@ -4,7 +4,6 @@ import pytest
 
 from config import Settings
 
-
 def configure_required_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -37,7 +36,6 @@ def configure_required_environment(
         "300",
     )
 
-
 def test_loads_ollama_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -63,7 +61,6 @@ def test_loads_ollama_configuration(
         == 300.0
     )
 
-
 def test_rejects_empty_ollama_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -84,7 +81,6 @@ def test_rejects_empty_ollama_url(
     ):
         Settings.load()
 
-
 def test_rejects_empty_general_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -104,7 +100,6 @@ def test_rejects_empty_general_model(
         ),
     ):
         Settings.load()
-
 
 def test_rejects_empty_coding_model(
     monkeypatch: pytest.MonkeyPatch,
@@ -171,7 +166,6 @@ def test_loads_multiple_telegram_users(
         )
     )
 
-
 def test_rejects_invalid_telegram_user_list(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -219,7 +213,6 @@ def test_loads_telegram_approver_users(
         )
     )
 
-
 def test_removes_duplicate_approver_users(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -243,7 +236,6 @@ def test_removes_duplicate_approver_users(
         == (123456,)
     )
 
-
 def test_rejects_empty_approver_user_list(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -264,7 +256,6 @@ def test_rejects_empty_approver_user_list(
         ),
     ):
         Settings.load()
-
 
 def test_rejects_invalid_approver_user_list(
     monkeypatch: pytest.MonkeyPatch,
@@ -287,7 +278,6 @@ def test_rejects_invalid_approver_user_list(
     ):
         Settings.load()
 
-
 def test_rejects_approver_that_is_not_allowed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -309,6 +299,51 @@ def test_rejects_approver_that_is_not_allowed(
         match=(
             "Todos los aprobadores deben ser "
             "usuarios autorizados"
+        ),
+    ):
+        Settings.load()
+
+def test_loads_execution_workspace_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    workspace_root = (
+        tmp_path / "workspaces"
+    )
+
+    monkeypatch.setenv(
+        "EXECUTION_WORKSPACE_ROOT",
+        str(workspace_root),
+    )
+
+    settings = Settings.load()
+
+    assert (
+        settings.execution_workspace_root
+        == workspace_root.resolve()
+    )
+
+def test_rejects_empty_execution_workspace_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "EXECUTION_WORKSPACE_ROOT",
+        "   ",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "EXECUTION_WORKSPACE_ROOT no "
+            "puede estar vacio"
         ),
     ):
         Settings.load()

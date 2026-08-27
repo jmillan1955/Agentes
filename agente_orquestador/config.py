@@ -29,6 +29,7 @@ class Settings:
     context_database_path: Path
     project_name: str
     project_root_path: Path
+    execution_workspace_root: Path
     git_repository: str | None
 
     ollama_base_url: str
@@ -166,6 +167,30 @@ class Settings:
                 BASE_DIR / database_path
             )
 
+        execution_workspace_value = os.getenv(
+            "EXECUTION_WORKSPACE_ROOT",
+            "../../Agentes_ejecuciones",
+        ).strip()
+
+        if not execution_workspace_value:
+            raise RuntimeError(
+                "EXECUTION_WORKSPACE_ROOT no "
+                "puede estar vacio"
+            )
+
+        execution_workspace_root = Path(
+            execution_workspace_value
+        )
+
+        if (
+            not execution_workspace_root
+            .is_absolute()
+        ):
+            execution_workspace_root = (
+                BASE_DIR
+                / execution_workspace_root
+            )
+
         project_name = os.getenv(
             "PROJECT_NAME",
             "Agente Orquestador",
@@ -179,11 +204,6 @@ class Settings:
         git_repository = os.getenv(
             "GIT_REPOSITORY",
             "",
-        ).strip()
-
-        ollama_base_url = os.getenv(
-            "OLLAMA_BASE_URL",
-            "http://127.0.0.1:11434",
         ).strip()
 
         ollama_base_url = os.getenv(
@@ -278,6 +298,9 @@ class Settings:
             project_name=project_name,
             project_root_path=(
                 BASE_DIR.resolve()
+            ),
+            execution_workspace_root=(
+                execution_workspace_root.resolve()
             ),
             git_repository=(
                 git_repository or None

@@ -23,7 +23,9 @@ EXPECTED_TABLES = {
     "task_approvals",
     "documents",
     "git_commits",
-    "task_approvals",
+    "task_executions",
+    "task_execution_attempts",
+    "task_execution_steps",
 }
 
 
@@ -45,6 +47,47 @@ EXPECTED_TASK_COLUMNS = {
 }
 
 
+EXPECTED_EXECUTION_COLUMNS = {
+    "id",
+    "task_id",
+    "plan_id",
+    "approval_id",
+    "status",
+    "workspace_path",
+    "requested_by_user_id",
+    "request_message_id",
+    "channel",
+    "attempt_count",
+    "created_at",
+    "started_at",
+    "finished_at",
+    "last_error",
+}
+EXPECTED_STEP_COLUMNS = {
+    "id",
+    "attempt_id",
+    "step_number",
+    "name",
+    "action_type",
+    "status",
+    "started_at",
+    "finished_at",
+    "exit_code",
+    "stdout_text",
+    "stderr_text",
+    "error_message",
+}
+EXPECTED_ATTEMPT_COLUMNS = {
+    "id",
+    "execution_id",
+    "attempt_number",
+    "status",
+    "started_at",
+    "finished_at",
+    "exit_code",
+    "error_message",
+}
+
 def get_table_names(
     database: ContextDatabase,
 ) -> set[str]:
@@ -60,7 +103,6 @@ def get_table_names(
         row["name"]
         for row in rows
     }
-
 
 def test_creates_database_and_tables(
     tmp_path: Path,
@@ -84,7 +126,6 @@ def test_creates_database_and_tables(
 
     assert database_path.is_file()
 
-
 def test_creates_task_columns() -> None:
     with ContextDatabase(
         ":memory:"
@@ -102,7 +143,6 @@ def test_creates_task_columns() -> None:
             EXPECTED_TASK_COLUMNS
             <= columns
         )
-
 
 def test_creates_task_foreign_keys() -> None:
     with ContextDatabase(
@@ -133,6 +173,119 @@ def test_creates_task_foreign_keys() -> None:
             "id",
         ) in references
 
+def test_uses_schema_version_seven() -> None:
+    assert SCHEMA_VERSION == 7
+
+def test_creates_execution_columns() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA table_info(
+                task_executions
+            )
+            """
+        ).fetchall()
+
+        columns = {
+            row["name"]
+            for row in rows
+        }
+
+        assert (
+            EXPECTED_EXECUTION_COLUMNS
+            <= columns
+        )
+
+def test_creates_execution_foreign_keys() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA foreign_key_list(
+                task_executions
+            )
+            """
+        ).fetchall()
+
+        references = {
+            (
+                row["from"],
+                row["table"],
+                row["to"],
+            )
+            for row in rows
+        }
+
+        assert (
+            "task_id",
+            "tasks",
+            "id",
+        ) in references
+
+        assert (
+            "plan_id",
+            "task_plans",
+            "id",
+        ) in references
+
+        assert (
+            "approval_id",
+            "task_approvals",
+            "id",
+        ) in references
+
+def test_creates_attempt_columns() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA table_info(
+                task_execution_attempts
+            )
+            """
+        ).fetchall()
+
+        columns = {
+            row["name"]
+            for row in rows
+        }
+
+        assert (
+            EXPECTED_ATTEMPT_COLUMNS
+            <= columns
+        )
+
+
+def test_creates_attempt_foreign_key() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA foreign_key_list(
+                task_execution_attempts
+            )
+            """
+        ).fetchall()
+
+        references = {
+            (
+                row["from"],
+                row["table"],
+                row["to"],
+            )
+            for row in rows
+        }
+
+        assert (
+            "execution_id",
+            "task_executions",
+            "id",
+        ) in references
 
 def test_updates_existing_database(
     tmp_path: Path,
@@ -172,7 +325,6 @@ def test_updates_existing_database(
 
         assert version == SCHEMA_VERSION
 
-
 def test_rejects_newer_schema(
     tmp_path: Path,
 ) -> None:
@@ -200,7 +352,6 @@ def test_rejects_newer_schema(
             database_path
         ).connect()
 
-
 def test_activates_foreign_keys_and_wal(
     tmp_path: Path,
 ) -> None:
@@ -226,7 +377,6 @@ def test_activates_foreign_keys_and_wal(
         assert foreign_keys == 1
         assert journal_mode.lower() == "wal"
 
-
 def test_schema_is_idempotent() -> None:
     with ContextDatabase(
         ":memory:"
@@ -241,7 +391,6 @@ def test_schema_is_idempotent() -> None:
         tables = get_table_names(database)
 
         assert EXPECTED_TABLES <= tables
-
 
 def test_memory_database_does_not_create_file(
     tmp_path: Path,
@@ -258,7 +407,6 @@ def test_memory_database_does_not_create_file(
 
     assert list(tmp_path.iterdir()) == []
 
-
 def test_connection_is_unavailable_after_close() -> None:
     database = ContextDatabase(
         ":memory:"
@@ -272,7 +420,6 @@ def test_connection_is_unavailable_after_close() -> None:
         match="no está conectada",
     ):
         _ = database.connection
-
 
 def test_allows_connection_from_worker_thread(
     tmp_path: Path,
@@ -302,3 +449,53 @@ def test_allows_connection_from_worker_thread(
             ).result()
 
         assert result == 1
+
+def test_creates_step_columns() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA table_info(
+                task_execution_steps
+            )
+            """
+        ).fetchall()
+
+        columns = {
+            row["name"]
+            for row in rows
+        }
+
+        assert (
+            EXPECTED_STEP_COLUMNS
+            <= columns
+        )
+
+
+def test_creates_step_foreign_key() -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        rows = database.connection.execute(
+            """
+            PRAGMA foreign_key_list(
+                task_execution_steps
+            )
+            """
+        ).fetchall()
+
+        references = {
+            (
+                row["from"],
+                row["table"],
+                row["to"],
+            )
+            for row in rows
+        }
+
+        assert (
+            "attempt_id",
+            "task_execution_attempts",
+            "id",
+        ) in references
