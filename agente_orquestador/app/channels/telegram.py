@@ -94,6 +94,13 @@ class TelegramChannel:
 
         application.add_handler(
             CommandHandler(
+                "cancelar_ejecucion",
+                self.handle_cancel_execution,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
                 "preparar_ejecucion",
                 self.handle_prepare_execution,
             )
@@ -365,6 +372,16 @@ class TelegramChannel:
         )
 
     async def handle_cancel(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_cancel_execution(
         self,
         update: Update,
         context: ContextTypes.DEFAULT_TYPE,

@@ -1086,7 +1086,10 @@ def test_approves_task_plan_with_command(
             user_id="123456",
             conversation_id="chat-123456",
             content_type=ContentType.COMMAND,
-            text=f"/cancelar {task.id}",
+            text=(
+                "/cancelar_ejecucion "
+                f"{task.id}"
+            ),
             message_id=(
                 "telegram:chat-123456:301"
             ),
@@ -1123,6 +1126,12 @@ def test_approves_task_plan_with_command(
             )
         )
         assert (
+            "Ejecucion asociada: "
+            f"#{stored_execution.id} "
+            "(cancelled)."
+            in cancellation_response.text
+        )
+        assert (
             f"Tarea: #{task.id}"
             in cancellation_response.text
         )
@@ -1146,7 +1155,9 @@ def test_approves_task_plan_with_command(
             cancellation_response.metadata[
                 "route"
             ]
-            == "cancellation_service"
+            == (
+                "execution_cancellation_service"
+            )
         )
         assert (
             cancellation_response.metadata[
@@ -1938,3 +1949,54 @@ def test_view_execution_reports_missing_execution(
         )
 
         execution_runner.run.assert_not_called()
+
+def test_cancel_execution_requires_task_id(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        query_service = Mock()
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_query_service=(
+                query_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/cancelar_ejecucion",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:520"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar la tarea cuya "
+            "ejecucion quieres cancelar."
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "execution_cancellation_service"
+        )
+        assert (
+            outgoing.metadata[
+                "execution_error"
+            ]
+            == "missing_task_id"
+        )
+
+        query_service.get_by_task_id.assert_not_called()

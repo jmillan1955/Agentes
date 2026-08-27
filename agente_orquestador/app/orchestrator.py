@@ -510,6 +510,15 @@ class Orchestrator:
                 channel=channel,
             )
 
+        if command == "/cancelar_ejecucion":
+            return (
+                self
+                ._process_cancel_execution_command(
+                    arguments=arguments,
+                    user_id=user_id,
+                )
+            )
+
         if command == "/cancelar":
             return self._process_cancel_command(
                 arguments=arguments,
@@ -582,6 +591,8 @@ class Orchestrator:
                 "/preparar_ejecucion "
                 "<tarea_id>\n"
                 "/cancelar <tarea_id>\n"
+                "/cancelar_ejecucion "
+                "<tarea_id>\n"
                 "/simple <pregunta>"
             ),
             {},
@@ -1223,6 +1234,179 @@ class Orchestrator:
                     result.already_prepared
                 ),
             },
+        )
+
+    def _process_cancel_execution_command(
+        self,
+        arguments: str,
+        user_id: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        route = (
+            "execution_cancellation_service"
+        )
+
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuya "
+                    "ejecucion quieres cancelar."
+                    "\n\nEjemplo:\n"
+                    "/cancelar_ejecucion 4"
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/cancelar_ejecucion 4"
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/cancelar_ejecucion 4"
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if self._execution_query_service is None:
+            return (
+                (
+                    "El servicio de consulta de "
+                    "ejecuciones no esta "
+                    "disponible."
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "service_unavailable"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        try:
+            current = (
+                self._execution_query_service
+                .get_by_task_id(task_id)
+            )
+
+        except ExecutionQueryError as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "execution_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        if current.execution.task_id != task_id:
+            raise RuntimeError(
+                "La ejecucion no corresponde "
+                "a la tarea indicada"
+            )
+
+        text, cancellation_metadata = (
+            self._process_cancel_command(
+                arguments=arguments,
+                user_id=user_id,
+            )
+        )
+
+        if (
+            "cancellation_error"
+            in cancellation_metadata
+        ):
+            metadata = dict(
+                cancellation_metadata
+            )
+            metadata["route"] = route
+            metadata["execution_error"] = (
+                metadata.pop(
+                    "cancellation_error"
+                )
+            )
+
+            return text, metadata
+
+        try:
+            updated = (
+                self._execution_query_service
+                .get_by_task_id(task_id)
+            )
+
+        except ExecutionQueryError as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "execution_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        execution = updated.execution
+
+        metadata = dict(
+            cancellation_metadata
+        )
+        metadata.update(
+            {
+                "route": route,
+                "execution_id": (
+                    execution.id
+                ),
+                "execution_status": (
+                    execution.status.value
+                ),
+            }
+        )
+
+        return (
+            (
+                f"{text}\n\n"
+                "Ejecucion asociada: "
+                f"#{execution.id} "
+                f"({execution.status.value})."
+            ),
+            metadata,
         )
 
     def _process_cancel_command(

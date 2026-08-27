@@ -322,3 +322,26 @@ def test_view_execution_handler_delegates_command(
         update=update,
         content_type=ContentType.COMMAND,
     )
+
+def test_cancel_execution_handler_delegates_command(
+) -> None:
+    channel = create_channel()
+
+    update = SimpleNamespace()
+    context = SimpleNamespace()
+
+    process_update = AsyncMock()
+
+    channel._process_update = process_update
+
+    asyncio.run(
+        channel.handle_cancel_execution(
+            update=update,
+            context=context,
+        )
+    )
+
+    process_update.assert_awaited_once_with(
+        update=update,
+        content_type=ContentType.COMMAND,
+    )
