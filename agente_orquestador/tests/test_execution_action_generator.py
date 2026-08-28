@@ -504,6 +504,95 @@ def test_requires_pytest_as_last_action() -> None:
 
     manifest_service.create.assert_not_called()
 
+def test_rejects_duplicate_write_paths(
+) -> None:
+    duplicate_response = json.dumps(
+        {
+            "actions": [
+                {
+                    "step_number": 1,
+                    "name": "Crear modulo",
+                    "action_type": (
+                        "write_text_file"
+                    ),
+                    "relative_path": "suma.py",
+                    "content": (
+                        "def sumar(a, b):\n"
+                        "    return a + b\n"
+                    ),
+                },
+                {
+                    "step_number": 2,
+                    "name": "Crear pruebas",
+                    "action_type": (
+                        "write_text_file"
+                    ),
+                    "relative_path": (
+                        "tests/test_suma.py"
+                    ),
+                    "content": (
+                        "from suma import sumar\n\n"
+                        "def test_sumar():\n"
+                        "    assert sumar(2, 3) == 5\n"
+                    ),
+                },
+                {
+                    "step_number": 3,
+                    "name": (
+                        "Sobrescribir pruebas"
+                    ),
+                    "action_type": (
+                        "write_text_file"
+                    ),
+                    "relative_path": (
+                        "tests/test_suma.py"
+                    ),
+                    "content": (
+                        "def test_incorrecto():\n"
+                        "    assert False\n"
+                    ),
+                },
+                {
+                    "step_number": 4,
+                    "name": "Ejecutar pruebas",
+                    "action_type": "run_pytest",
+                    "relative_path": ".",
+                    "content": None,
+                },
+            ]
+        }
+    )
+
+    provider = Mock()
+    provider.generate.return_value = (
+        LanguageResponse(
+            text=duplicate_response,
+            model="modelo-de-prueba",
+            elapsed_seconds=0.1,
+        )
+    )
+    manifest_service = Mock()
+
+    generator = ExecutionActionGenerator(
+        language_provider=provider,
+        manifest_service=manifest_service,
+        limits=ExecutionLimits(),
+    )
+
+    with pytest.raises(
+        ExecutionActionGenerationError,
+        match=(
+            "No se puede escribir mas "
+            "de una vez sobre la misma ruta"
+        ),
+    ):
+        generator.generate(
+            execution_id=5,
+            plan=create_approved_plan(),
+        )
+
+    assert provider.generate.call_count == 3
+    manifest_service.create.assert_not_called()
 
 def test_retries_invalid_model_response(
 ) -> None:

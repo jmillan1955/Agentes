@@ -424,12 +424,51 @@ class ExecutionActionGenerator:
                 "La ultima accion debe ser "
                 "run_pytest"
             )
+        self._validate_unique_write_paths(
+            actions
+        )
 
+        self._validate_python_actions(
+            actions
+        )
         self._validate_python_actions(
             actions
         )
 
         return actions
+    @staticmethod
+    def _validate_unique_write_paths(
+        actions: tuple[
+            ExecutionAction,
+            ...,
+        ],
+    ) -> None:
+        written_paths: set[str] = set()
+
+        for action in actions:
+            if (
+                action.action_type
+                != ExecutionActionType
+                .WRITE_TEXT_FILE
+            ):
+                continue
+
+            normalized_path = (
+                action.relative_path
+                .replace("\\", "/")
+            )
+
+            if normalized_path in written_paths:
+                raise (
+                    ExecutionActionGenerationError(
+                        "No se puede escribir mas "
+                        "de una vez sobre la misma "
+                        "ruta: "
+                        f"{normalized_path}"
+                    )
+                )
+
+            written_paths.add(normalized_path)
 
     def _validate_python_actions(
         self,
