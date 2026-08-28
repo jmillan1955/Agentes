@@ -236,6 +236,14 @@ def test_generates_and_persists_manifest() -> None:
     assert provider.system_prompt is not None
     assert provider.response_format == "json"
     assert "JSON" in provider.system_prompt
+    assert (
+        "pytest desde la raiz del workspace"
+        in provider.system_prompt
+    )
+    assert (
+        "No utilices una estructura src"
+        in provider.system_prompt
+    )
     assert provider.prompt is not None
     assert (
         create_approved_plan().objective
