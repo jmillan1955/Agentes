@@ -1019,10 +1019,102 @@ class Orchestrator:
                 )
             )
 
-        except (
-            ExecutionStartError,
-            ExecutionRunError,
-        ) as error:
+        except ExecutionRunError as error:
+            sandbox_result = (
+                error.sandbox_result
+            )
+
+            if sandbox_result is None:
+                return (
+                    (
+                        "EJECUCION FALLIDA\n\n"
+                        f"{error}\n\n"
+                        "Consulta el detalle con:\n"
+                        f"/ver_ejecucion {task_id}"
+                    ),
+                    {
+                        "route": route,
+                        "execution_error": (
+                            type(error).__name__
+                        ),
+                        "task_id": task_id,
+                    },
+                )
+
+            stdout_summary = (
+                sandbox_result.stdout_text[
+                    -1200:
+                ]
+            )
+            stderr_summary = (
+                sandbox_result.stderr_text[
+                    -1200:
+                ]
+            )
+
+            lines = [
+                "EJECUCION FALLIDA",
+                "",
+                str(error),
+                (
+                    "Codigo de salida: "
+                    f"{sandbox_result.exit_code}"
+                ),
+                (
+                    "Tiempo: "
+                    f"{sandbox_result.duration_seconds:.2f} "
+                    "segundos"
+                ),
+            ]
+
+            if stdout_summary:
+                lines.extend(
+                    (
+                        "",
+                        "SALIDA DE PYTEST",
+                        stdout_summary,
+                    )
+                )
+
+            if stderr_summary:
+                lines.extend(
+                    (
+                        "",
+                        "ERRORES DE PYTEST",
+                        stderr_summary,
+                    )
+                )
+
+            lines.extend(
+                (
+                    "",
+                    "Consulta la auditoria con:",
+                    f"/ver_ejecucion {task_id}",
+                )
+            )
+
+            return (
+                "\n".join(lines),
+                {
+                    "route": route,
+                    "execution_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                    "exit_code": (
+                        sandbox_result.exit_code
+                    ),
+                    "timed_out": (
+                        sandbox_result.timed_out
+                    ),
+                    "duration_seconds": (
+                        sandbox_result
+                        .duration_seconds
+                    ),
+                },
+            )
+
+        except ExecutionStartError as error:
             return (
                 str(error),
                 {
@@ -1033,7 +1125,6 @@ class Orchestrator:
                     "task_id": task_id,
                 },
             )
-
         run_result = result.run_result
         execution = run_result.execution
         attempt = run_result.attempt

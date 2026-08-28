@@ -33,13 +33,26 @@ from app.execution.models import (
     ExecutionStep,
     TaskExecution,
 )
-
+from app.execution.sandbox import (
+    SandboxRunResult,
+)
 
 class ExecutionRunError(
     RuntimeError
 ):
     """La ejecucion controlada ha fallado."""
 
+    def __init__(
+        self,
+        message: str,
+        sandbox_result: (
+            SandboxRunResult | None
+        ) = None,
+    ) -> None:
+        super().__init__(message)
+        self.sandbox_result = (
+            sandbox_result
+        )
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRunResult:
@@ -206,7 +219,10 @@ class ExecutionRunner:
                 )
 
                 raise ExecutionRunError(
-                    error_text
+                    error_text,
+                    sandbox_result=(
+                        error.result
+                    ),
                 ) from error
 
             except Exception as error:

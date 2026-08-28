@@ -50,6 +50,12 @@ from app.execution.query import (
 from app.execution.manifest_service import (
     ExecutionManifestConfirmationError,
 )
+from app.execution.runner import (
+    ExecutionRunError,
+)
+from app.execution.sandbox import (
+    SandboxRunResult,
+)
 class FakeResponseGenerationService:
     def generate(
         self,
@@ -2634,3 +2640,100 @@ def test_starts_confirmed_execution_with_command(
         )
 
         execution_runner.run.assert_not_called()
+
+def test_reports_failed_sandbox_execution(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        start_service = Mock()
+
+        start_service.start.side_effect = (
+            ExecutionRunError(
+                "Pytest finalizo con errores",
+                sandbox_result=(
+                    SandboxRunResult(
+                        exit_code=1,
+                        stdout_text=(
+                            "FAILED "
+                            "tests/test_suma.py\n"
+                        ),
+                        stderr_text=(
+                            "AssertionError: "
+                            "assert 3 == 4"
+                        ),
+                        timed_out=False,
+                        duration_seconds=0.3,
+                    )
+                ),
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_start_service=(
+                start_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/iniciar_ejecucion 3",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:561"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "EJECUCION FALLIDA"
+        )
+        assert (
+            "Pytest finalizo con errores"
+            in outgoing.text
+        )
+        assert (
+            "FAILED tests/test_suma.py"
+            in outgoing.text
+        )
+        assert (
+            "AssertionError: assert 3 == 4"
+            in outgoing.text
+        )
+        assert (
+            "/ver_ejecucion 3"
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "execution_start_service"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == 3
+        )
+        assert (
+            outgoing.metadata["exit_code"]
+            == 1
+        )
+        assert (
+            outgoing.metadata["timed_out"]
+            is False
+        )
+        assert (
+            outgoing.metadata[
+                "duration_seconds"
+            ]
+            == 0.3
+        )

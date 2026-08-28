@@ -464,3 +464,90 @@ def test_runs_pytest_through_sandbox_backend(
             backend.requests[0].workspace_path
             == workspace.resolve()
         )
+
+def test_preserves_failed_sandbox_result(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "workspaces"
+    workspace = root / "temporal"
+
+    sandbox_result = SandboxRunResult(
+        exit_code=1,
+        stdout_text=(
+            "FAILED tests/test_suma.py::"
+            "test_suma\n"
+        ),
+        stderr_text=(
+            "AssertionError: "
+            "assert 3 == 4"
+        ),
+        timed_out=False,
+        duration_seconds=0.3,
+    )
+
+    backend = FakeRunnerSandboxBackend(
+        sandbox_result
+    )
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        context = prepare_execution_context(
+            database=database,
+            workspace_path=workspace,
+        )
+
+        runner = create_runner(
+            context=context,
+            root=root,
+            sandbox_backend=backend,
+        )
+
+        with pytest.raises(
+            ExecutionRunError,
+            match="Pytest finalizo con errores",
+        ) as captured:
+            runner.run(
+                execution_id=(
+                    context.execution.id
+                ),
+                actions=(
+                    ExecutionAction(
+                        step_number=1,
+                        name="Ejecutar pruebas",
+                        action_type=(
+                            ExecutionActionType
+                            .RUN_PYTEST
+                        ),
+                        relative_path="tests",
+                    ),
+                ),
+            )
+
+        assert (
+            captured.value.sandbox_result
+            == sandbox_result
+        )
+        assert (
+            captured.value
+            .sandbox_result.exit_code
+            == 1
+        )
+        assert (
+            "AssertionError"
+            in captured.value
+            .sandbox_result.stderr_text
+        )
+
+        stored_execution = (
+            context.execution_repository
+            .get_by_id(
+                context.execution.id
+            )
+        )
+
+        assert stored_execution is not None
+        assert (
+            stored_execution.status
+            == ExecutionStatus.FAILED
+        )
