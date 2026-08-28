@@ -387,16 +387,6 @@ def test_view_manifest_handler_delegates_command(
         content_type=ContentType.COMMAND,
     )
 
-    async def handle_confirm_manifest(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-    ) -> None:
-        await self._process_update(
-            update=update,
-            content_type=ContentType.COMMAND,
-        )
-
 def test_confirm_manifest_handler_delegates_command(
 ) -> None:
     channel = create_channel()
