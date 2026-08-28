@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import ast
 from dataclasses import dataclass
 from pathlib import (
     PurePosixPath,
@@ -400,7 +401,200 @@ class ExecutionActionGenerator:
                 "run_pytest"
             )
 
+        self._validate_python_actions(
+            actions
+        )
+
         return actions
+
+    def _validate_python_actions(
+        self,
+        actions: tuple[
+            ExecutionAction,
+            ...,
+        ],
+    ) -> None:
+        python_files = {
+            action.relative_path
+            .replace("\\", "/")
+            .lstrip("./")
+            for action in actions
+            if (
+                action.action_type
+                == ExecutionActionType
+                .WRITE_TEXT_FILE
+                and action.relative_path
+                .lower()
+                .endswith(".py")
+            )
+        }
+
+        source_files = {
+            path
+            for path in python_files
+            if not (
+                path == "tests.py"
+                or path.startswith("tests/")
+                or path.startswith("test_")
+            )
+        }
+
+        source_top_levels = {
+            (
+                path.split("/", maxsplit=1)[0]
+                if "/" in path
+                else path[:-3]
+            )
+            for path in source_files
+        }
+
+        for action in actions:
+            if (
+                action.action_type
+                != ExecutionActionType
+                .WRITE_TEXT_FILE
+                or not action.relative_path
+                .lower()
+                .endswith(".py")
+                or action.content is None
+            ):
+                continue
+
+            relative_path = (
+                action.relative_path
+                .replace("\\", "/")
+            )
+
+            try:
+                tree = ast.parse(
+                    action.content,
+                    filename=relative_path,
+                )
+
+            except SyntaxError as error:
+                raise (
+                    ExecutionActionGenerationError(
+                        "El archivo generado "
+                        f"'{relative_path}' contiene "
+                        "sintaxis Python no valida: "
+                        f"{error.msg}"
+                    )
+                ) from error
+
+            if not (
+                relative_path.startswith(
+                    "tests/"
+                )
+                or relative_path.startswith(
+                    "test_"
+                )
+            ):
+                continue
+
+            self._validate_test_imports(
+                tree=tree,
+                test_path=relative_path,
+                python_files=python_files,
+                source_top_levels=(
+                    source_top_levels
+                ),
+            )
+
+    def _validate_test_imports(
+        self,
+        tree: ast.AST,
+        test_path: str,
+        python_files: set[str],
+        source_top_levels: set[str],
+    ) -> None:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules = tuple(
+                    alias.name
+                    for alias in node.names
+                )
+
+            elif (
+                isinstance(node, ast.ImportFrom)
+                and node.level == 0
+                and node.module is not None
+            ):
+                modules = (node.module,)
+
+            else:
+                continue
+
+            for module in modules:
+                top_level = module.split(
+                    ".",
+                    maxsplit=1,
+                )[0]
+
+                if (
+                    top_level
+                    not in source_top_levels
+                ):
+                    continue
+
+                if self._module_exists(
+                    module=module,
+                    python_files=python_files,
+                ):
+                    continue
+
+                if isinstance(
+                    node,
+                    ast.ImportFrom,
+                ):
+                    imported_modules_exist = all(
+                        (
+                            alias.name == "*"
+                            or self._module_exists(
+                                module=(
+                                    f"{module}."
+                                    f"{alias.name}"
+                                ),
+                                python_files=(
+                                    python_files
+                                ),
+                            )
+                        )
+                        for alias in node.names
+                    )
+
+                    if imported_modules_exist:
+                        continue
+
+                raise (
+                    ExecutionActionGenerationError(
+                        "El modulo generado "
+                        f"'{module}' no puede "
+                        "importarse desde "
+                        f"'{test_path}'. "
+                        "Corrige la ruta del modulo, "
+                        "crea __init__.py o corrige "
+                        "el import de la prueba"
+                    )
+                )
+
+    @staticmethod
+    def _module_exists(
+        module: str,
+        python_files: set[str],
+    ) -> bool:
+        module_path = module.replace(
+            ".",
+            "/",
+        )
+
+        return (
+            f"{module_path}.py"
+            in python_files
+            or (
+                f"{module_path}/__init__.py"
+                in python_files
+            )
+        )
 
     def _parse_action(
         self,
