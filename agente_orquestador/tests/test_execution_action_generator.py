@@ -249,7 +249,10 @@ def test_generates_and_persists_manifest() -> None:
         create_approved_plan().objective
         in provider.prompt
     )
-
+    assert (
+        "Crear solamente suma/suma.py"
+        in provider.system_prompt
+    )
 @pytest.mark.parametrize(
     "unsafe_path",
     (
@@ -615,7 +618,7 @@ def test_retries_invalid_model_response(
         actions=result.actions,
     )
 
-def test_does_not_persist_after_two_invalid_responses(
+def test_does_not_persist_after_three_invalid_responses(
 ) -> None:
     invalid_response = json.dumps(
         {
@@ -653,6 +656,11 @@ def test_does_not_persist_after_two_invalid_responses(
             model="modelo-de-prueba",
             elapsed_seconds=0.5,
         ),
+        LanguageResponse(
+            text=invalid_response,
+            model="modelo-de-prueba",
+            elapsed_seconds=0.5,
+        ),
     )
 
     manifest_service = Mock()
@@ -675,7 +683,7 @@ def test_does_not_persist_after_two_invalid_responses(
             plan=create_approved_plan(),
         )
 
-    assert provider.generate.call_count == 2
+    assert provider.generate.call_count == 3
     manifest_service.create.assert_not_called()
 
 

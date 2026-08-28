@@ -70,7 +70,7 @@ class ExecutionActionGenerator:
         "content",
     }
 
-    _MAX_GENERATION_ATTEMPTS = 2
+    _MAX_GENERATION_ATTEMPTS = 3
     _MAX_RETRY_RESPONSE_CHARACTERS = 6000
 
     def __init__(
@@ -245,6 +245,13 @@ class ExecutionActionGenerator:
             "con la ruta del modulo generado.\n"
             "La ultima accion debe ser "
             "run_pytest."
+            "Ejemplo obligatorio: si una prueba "
+            "usa 'from suma import sumar', debes "
+            "crear suma.py con la funcion sumar, "
+            "o crear suma/__init__.py que exporte "
+            "la funcion desde el modulo interno.\n"
+            "Crear solamente suma/suma.py no hace "
+            "valido 'from suma import sumar'.\n"
         )
 
     def _build_prompt(
@@ -312,6 +319,11 @@ class ExecutionActionGenerator:
             "completo.\n"
             "No devuelvas solamente la accion "
             "corregida.\n"
+            "Si una prueba importa una funcion "
+            "desde un paquete, crea __init__.py "
+            "y exporta expresamente esa funcion, "
+            "o coloca la funcion en un modulo "
+            "del mismo nombre en la raiz.\n"
             "Error de validacion:\n"
             f"{validation_error}\n\n"
             "Respuesta anterior no valida:\n"
