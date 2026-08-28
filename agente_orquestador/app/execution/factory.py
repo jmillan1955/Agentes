@@ -51,7 +51,9 @@ from app.providers.base import (
 from app.execution.start_service import (
     ExecutionStartService,
 )
-
+from app.execution.split_action_generator import (
+    SplitExecutionActionGenerator,
+)
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
     preparation_service: (
@@ -138,7 +140,7 @@ def create_execution_runtime(
     )
 
     action_generator = (
-        ExecutionActionGenerator(
+        SplitExecutionActionGenerator(
             language_provider=(
                 language_provider
             ),

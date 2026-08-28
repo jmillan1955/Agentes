@@ -26,6 +26,9 @@ from app.execution.action_generator import (
 from app.execution.start_service import (
     ExecutionStartService,
 )
+from app.execution.split_action_generator import (
+    SplitExecutionActionGenerator,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -68,6 +71,10 @@ def test_creates_runtime_without_gateway(
         assert isinstance(
             runtime.action_generator,
             ExecutionActionGenerator,
+        )
+        assert isinstance(
+            runtime.action_generator,
+            SplitExecutionActionGenerator,
         )
         assert isinstance(
             runtime.start_service,
