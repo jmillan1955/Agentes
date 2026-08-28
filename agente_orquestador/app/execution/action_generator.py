@@ -69,6 +69,9 @@ class ExecutionActionGenerator:
         "content",
     }
 
+    _MAX_GENERATION_ATTEMPTS = 2
+    _MAX_RETRY_RESPONSE_CHARACTERS = 6000
+
     def __init__(
         self,
         language_provider: LanguageProvider,
@@ -98,19 +101,68 @@ class ExecutionActionGenerator:
 
         self._validate_plan(plan)
 
-        response = (
-            self._language_provider.generate(
-                prompt=self._build_prompt(plan),
-                system_prompt=(
-                    self._build_system_prompt()
-                ),
-                response_format="json",
-            )
+        prompt = self._build_prompt(plan)
+        system_prompt = (
+            self._build_system_prompt()
         )
 
-        actions = self._parse_actions(
-            response.text
-        )
+        total_elapsed_seconds = 0.0
+        actions = None
+        response = None
+
+        for attempt_number in range(
+            1,
+            self._MAX_GENERATION_ATTEMPTS + 1,
+        ):
+            response = (
+                self._language_provider.generate(
+                    prompt=prompt,
+                    system_prompt=(
+                        system_prompt
+                    ),
+                    response_format="json",
+                )
+            )
+
+            total_elapsed_seconds += (
+                response.elapsed_seconds
+            )
+
+            try:
+                actions = self._parse_actions(
+                    response.text
+                )
+
+            except (
+                ExecutionActionGenerationError
+            ) as error:
+                if (
+                    attempt_number
+                    >= self
+                    ._MAX_GENERATION_ATTEMPTS
+                ):
+                    raise
+
+                prompt = (
+                    self._build_correction_prompt(
+                        plan=plan,
+                        invalid_response=(
+                            response.text
+                        ),
+                        validation_error=(
+                            str(error)
+                        ),
+                    )
+                )
+
+                continue
+
+            break
+
+        if actions is None or response is None:
+            raise RuntimeError(
+                "No se obtuvo un manifiesto"
+            )
 
         manifest = self._manifest_service.create(
             execution_id=execution_id,
@@ -122,7 +174,7 @@ class ExecutionActionGenerator:
             actions=actions,
             model=response.model,
             elapsed_seconds=(
-                response.elapsed_seconds
+                total_elapsed_seconds
             ),
         )
 
@@ -162,6 +214,11 @@ class ExecutionActionGenerator:
             "write_text_file y run_pytest.\n"
             "Todas las rutas deben ser relativas "
             "al workspace.\n"
+            "relative_path nunca puede estar "
+            "vacio.\n"
+            "Para representar la raiz del "
+            "workspace utiliza un punto, pero "
+            "no crees la raiz porque ya existe.\n"
             "No utilices rutas absolutas, .., "
             "comandos de sistema, enlaces ni "
             "acceso a red.\n"
@@ -232,6 +289,32 @@ class ExecutionActionGenerator:
             "Genera el manifiesto de acciones "
             "para este plan aprobado.\n\n"
             f"{serialized_plan}"
+        )
+
+    def _build_correction_prompt(
+        self,
+        plan: TaskPlan,
+        invalid_response: str,
+        validation_error: str,
+    ) -> str:
+        response_summary = (
+            invalid_response[
+                -self
+                ._MAX_RETRY_RESPONSE_CHARACTERS:
+            ]
+        )
+
+        return (
+            f"{self._build_prompt(plan)}\n\n"
+            "Corrige la respuesta anterior y "
+            "devuelve de nuevo el objeto JSON "
+            "completo.\n"
+            "No devuelvas solamente la accion "
+            "corregida.\n"
+            "Error de validacion:\n"
+            f"{validation_error}\n\n"
+            "Respuesta anterior no valida:\n"
+            f"{response_summary}"
         )
 
     def _parse_actions(

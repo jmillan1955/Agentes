@@ -491,3 +491,189 @@ def test_requires_pytest_as_last_action() -> None:
         )
 
     manifest_service.create.assert_not_called()
+
+
+def test_retries_invalid_model_response(
+) -> None:
+    invalid_response = json.dumps(
+        {
+            "actions": [
+                {
+                    "step_number": 1,
+                    "name": "Crear raiz",
+                    "action_type": (
+                        "create_directory"
+                    ),
+                    "relative_path": "",
+                    "content": None,
+                },
+                {
+                    "step_number": 2,
+                    "name": "Ejecutar pruebas",
+                    "action_type": "run_pytest",
+                    "relative_path": "tests",
+                    "content": None,
+                },
+            ]
+        }
+    )
+
+    corrected_response = json.dumps(
+        {
+            "actions": [
+                {
+                    "step_number": 1,
+                    "name": "Crear modulo",
+                    "action_type": (
+                        "write_text_file"
+                    ),
+                    "relative_path": "suma.py",
+                    "content": (
+                        "def sumar(a, b):\n"
+                        "    return a + b\n"
+                    ),
+                },
+                {
+                    "step_number": 2,
+                    "name": "Crear pruebas",
+                    "action_type": (
+                        "write_text_file"
+                    ),
+                    "relative_path": (
+                        "tests/test_suma.py"
+                    ),
+                    "content": (
+                        "from suma import sumar\n\n"
+                        "def test_sumar():\n"
+                        "    assert sumar(2, 3) == 5\n"
+                    ),
+                },
+                {
+                    "step_number": 3,
+                    "name": "Ejecutar pruebas",
+                    "action_type": "run_pytest",
+                    "relative_path": "tests",
+                    "content": None,
+                },
+            ]
+        }
+    )
+
+    provider = Mock()
+
+    provider.generate.side_effect = (
+        LanguageResponse(
+            text=invalid_response,
+            model="modelo-de-prueba",
+            elapsed_seconds=0.5,
+        ),
+        LanguageResponse(
+            text=corrected_response,
+            model="modelo-de-prueba",
+            elapsed_seconds=0.75,
+        ),
+    )
+
+    manifest_service = Mock()
+    stored_manifest = object()
+
+    manifest_service.create.return_value = (
+        stored_manifest
+    )
+
+    generator = ExecutionActionGenerator(
+        language_provider=provider,
+        manifest_service=manifest_service,
+        limits=ExecutionLimits(),
+    )
+
+    result = generator.generate(
+        execution_id=5,
+        plan=create_approved_plan(),
+    )
+
+    assert result.manifest is stored_manifest
+    assert len(result.actions) == 3
+    assert result.elapsed_seconds == 1.25
+
+    assert provider.generate.call_count == 2
+    assert (
+        "relative_path no puede estar vacio"
+        in provider.generate.call_args_list[
+            1
+        ].kwargs["prompt"]
+    )
+    assert (
+        "Corrige la respuesta anterior"
+        in provider.generate.call_args_list[
+            1
+        ].kwargs["prompt"]
+    )
+
+    manifest_service.create.assert_called_once_with(
+        execution_id=5,
+        actions=result.actions,
+    )
+
+def test_does_not_persist_after_two_invalid_responses(
+) -> None:
+    invalid_response = json.dumps(
+        {
+            "actions": [
+                {
+                    "step_number": 1,
+                    "name": "Ruta invalida",
+                    "action_type": (
+                        "write_text_file"
+                    ),
+                    "relative_path": "",
+                    "content": "contenido",
+                },
+                {
+                    "step_number": 2,
+                    "name": "Ejecutar pruebas",
+                    "action_type": "run_pytest",
+                    "relative_path": "tests",
+                    "content": None,
+                },
+            ]
+        }
+    )
+
+    provider = Mock()
+
+    provider.generate.side_effect = (
+        LanguageResponse(
+            text=invalid_response,
+            model="modelo-de-prueba",
+            elapsed_seconds=0.5,
+        ),
+        LanguageResponse(
+            text=invalid_response,
+            model="modelo-de-prueba",
+            elapsed_seconds=0.5,
+        ),
+    )
+
+    manifest_service = Mock()
+
+    generator = ExecutionActionGenerator(
+        language_provider=provider,
+        manifest_service=manifest_service,
+        limits=ExecutionLimits(),
+    )
+
+    with pytest.raises(
+        ExecutionActionGenerationError,
+        match=(
+            "relative_path no puede estar "
+            "vacio"
+        ),
+    ):
+        generator.generate(
+            execution_id=5,
+            plan=create_approved_plan(),
+        )
+
+    assert provider.generate.call_count == 2
+    manifest_service.create.assert_not_called()
