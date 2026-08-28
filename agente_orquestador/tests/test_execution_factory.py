@@ -23,6 +23,9 @@ from unittest.mock import Mock
 from app.execution.action_generator import (
     ExecutionActionGenerator,
 )
+from app.execution.start_service import (
+    ExecutionStartService,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -65,6 +68,10 @@ def test_creates_runtime_without_gateway(
         assert isinstance(
             runtime.action_generator,
             ExecutionActionGenerator,
+        )
+        assert isinstance(
+            runtime.start_service,
+            ExecutionStartService,
         )
         assert isinstance(
             runtime.runner,

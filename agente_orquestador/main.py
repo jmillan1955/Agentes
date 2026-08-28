@@ -385,6 +385,10 @@ def main() -> None:
                 execution_runtime
                 .action_generator
             ),
+            execution_start_service=(
+                execution_runtime
+                .start_service
+            ),
             execution_runner=(
                 execution_runtime.runner
             ),

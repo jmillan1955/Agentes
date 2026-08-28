@@ -48,6 +48,9 @@ from app.execution.action_generator import (
 from app.providers.base import (
     LanguageProvider,
 )
+from app.execution.start_service import (
+    ExecutionStartService,
+)
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
@@ -57,6 +60,7 @@ class ExecutionRuntime:
     query_service: ExecutionQueryService
     manifest_service: ExecutionManifestService
     action_generator: ExecutionActionGenerator
+    start_service: ExecutionStartService
     runner: ExecutionRunner
     sandbox_enabled: bool
 
@@ -216,6 +220,16 @@ def create_execution_runtime(
         sandbox_executor=sandbox_executor,
     )
 
+    start_service = ExecutionStartService(
+        execution_repository=(
+            execution_repository
+        ),
+        manifest_repository=(
+            manifest_repository
+        ),
+        runner=runner,
+    )
+
     return ExecutionRuntime(
         preparation_service=(
             preparation_service
@@ -223,6 +237,7 @@ def create_execution_runtime(
         query_service=query_service,
         manifest_service=manifest_service,
         action_generator=action_generator,
+        start_service=start_service,
         runner=runner,
         sandbox_enabled=(
             sandbox_executor is not None

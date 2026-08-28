@@ -18,6 +18,7 @@ from app.context import (
     TaskPlanRepository,
 )
 from app.execution.runner import (
+    ExecutionRunError,
     ExecutionRunner,
 )
 from app.execution.service import (
@@ -64,6 +65,10 @@ from app.execution.query import (
 from app.execution.manifest_service import (
     ExecutionManifestConfirmationError,
     ExecutionManifestService,
+)
+from app.execution.start_service import (
+    ExecutionStartError,
+    ExecutionStartService,
 )
 
 class Orchestrator:
@@ -113,6 +118,9 @@ class Orchestrator:
         ) = None,
         execution_action_generator: (
             ExecutionActionGenerator | None
+        ) = None,
+        execution_start_service: (
+            ExecutionStartService | None
         ) = None,
         execution_runner: (
             ExecutionRunner | None
@@ -164,6 +172,9 @@ class Orchestrator:
         )
         self._execution_action_generator = (
             execution_action_generator
+        )
+        self._execution_start_service = (
+            execution_start_service
         )
         self._execution_runner = (
             execution_runner
@@ -523,6 +534,14 @@ class Orchestrator:
                     channel=channel,
                 )
             )
+        if command == "/iniciar_ejecucion":
+            return (
+                self
+                ._process_start_execution_command(
+                    arguments=arguments,
+                    user_id=user_id,
+                )
+            )
         if command == "/ver_ejecucion":
             return (
                 self
@@ -636,6 +655,8 @@ class Orchestrator:
                 "/confirmar_manifiesto "
                 "<tarea_id> <hash> CONFIRMAR "
                 "[DESTRUCTIVO]\n"
+                "/iniciar_ejecucion "
+                "<tarea_id>\n"
                 "/aprobar <tarea_id>\n"
                 "/preparar_ejecucion "
                 "<tarea_id>\n"
@@ -907,6 +928,175 @@ class Orchestrator:
                 ),
                 "already_approved": (
                     result.already_approved
+                ),
+            },
+        )
+
+    def _process_start_execution_command(
+        self,
+        arguments: str,
+        user_id: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        route = "execution_start_service"
+
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuya "
+                    "ejecucion quieres iniciar."
+                    "\n\nEjemplo:\n"
+                    "/iniciar_ejecucion 4"
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/iniciar_ejecucion 4"
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/iniciar_ejecucion 4"
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if self._execution_start_service is None:
+            return (
+                (
+                    "El servicio de inicio de "
+                    "ejecuciones no esta disponible."
+                ),
+                {
+                    "route": route,
+                    "execution_error": (
+                        "service_unavailable"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        try:
+            result = (
+                self._execution_start_service
+                .start(
+                    task_id=task_id,
+                    requested_by_user_id=user_id,
+                )
+            )
+
+        except (
+            ExecutionStartError,
+            ExecutionRunError,
+        ) as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "execution_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        run_result = result.run_result
+        execution = run_result.execution
+        attempt = run_result.attempt
+        manifest = result.manifest
+
+        lines = [
+            "EJECUCION COMPLETADA",
+            "",
+            f"Tarea: #{execution.task_id}",
+            f"Ejecucion: #{execution.id}",
+            f"Manifiesto: #{manifest.id}",
+            (
+                "Version del manifiesto: "
+                f"{manifest.version}"
+            ),
+            (
+                "Intento: "
+                f"#{attempt.attempt_number}"
+            ),
+            (
+                "Estado: "
+                f"{execution.status.value}"
+            ),
+            (
+                "Acciones ejecutadas: "
+                f"{len(result.actions)}"
+            ),
+            "",
+            (
+                "La ejecucion y todos sus pasos "
+                "han quedado auditados."
+            ),
+            (
+                "Puedes consultar el detalle con:"
+            ),
+            f"/ver_ejecucion {task_id}",
+        ]
+
+        return (
+            "\n".join(lines),
+            {
+                "route": route,
+                "task_id": execution.task_id,
+                "execution_id": execution.id,
+                "execution_status": (
+                    execution.status.value
+                ),
+                "manifest_id": manifest.id,
+                "manifest_version": (
+                    manifest.version
+                ),
+                "manifest_hash": (
+                    manifest.manifest_hash
+                ),
+                "attempt_id": attempt.id,
+                "attempt_number": (
+                    attempt.attempt_number
+                ),
+                "action_count": (
+                    len(result.actions)
+                ),
+                "step_count": (
+                    len(run_result.steps)
                 ),
             },
         )

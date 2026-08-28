@@ -112,6 +112,7 @@ def create_orchestrator(
     execution_query_service=None,
     execution_manifest_service=None,
     execution_action_generator=None,
+    execution_start_service=None,
     execution_runner=None,
 ) -> Orchestrator:
     if context_query_service is None:
@@ -206,6 +207,9 @@ def create_orchestrator(
         ),
         execution_action_generator=(
             execution_action_generator
+        ),
+        execution_start_service=(
+            execution_start_service
         ),
         execution_runner=execution_runner,
     )
@@ -2513,4 +2517,120 @@ def test_generates_execution_manifest_with_command(
             execution_id=5,
             plan=plan,
         )
+        execution_runner.run.assert_not_called()
+
+def test_starts_confirmed_execution_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        start_service = Mock()
+        execution_runner = Mock()
+
+        start_service.start.return_value = (
+            SimpleNamespace(
+                manifest=SimpleNamespace(
+                    id=11,
+                    version=2,
+                    manifest_hash="a" * 64,
+                ),
+                actions=(
+                    SimpleNamespace(),
+                    SimpleNamespace(),
+                    SimpleNamespace(),
+                ),
+                run_result=SimpleNamespace(
+                    execution=SimpleNamespace(
+                        id=5,
+                        task_id=3,
+                        status=SimpleNamespace(
+                            value="completed"
+                        ),
+                    ),
+                    attempt=SimpleNamespace(
+                        id=21,
+                        attempt_number=1,
+                        status=SimpleNamespace(
+                            value="completed"
+                        ),
+                    ),
+                    steps=(
+                        SimpleNamespace(),
+                        SimpleNamespace(),
+                        SimpleNamespace(),
+                    ),
+                ),
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_start_service=(
+                start_service
+            ),
+            execution_runner=(
+                execution_runner
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/iniciar_ejecucion 3",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:560"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "EJECUCION COMPLETADA"
+        )
+        assert "Tarea: #3" in outgoing.text
+        assert "Ejecucion: #5" in outgoing.text
+        assert "Manifiesto: #11" in outgoing.text
+        assert "Intento: #1" in outgoing.text
+        assert "Acciones ejecutadas: 3" in (
+            outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "execution_start_service"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == 3
+        )
+        assert (
+            outgoing.metadata["execution_id"]
+            == 5
+        )
+        assert (
+            outgoing.metadata["manifest_id"]
+            == 11
+        )
+        assert (
+            outgoing.metadata["attempt_id"]
+            == 21
+        )
+        assert (
+            outgoing.metadata["execution_status"]
+            == "completed"
+        )
+
+        start_service.start.assert_called_once_with(
+            task_id=3,
+            requested_by_user_id="123456",
+        )
+
         execution_runner.run.assert_not_called()
