@@ -107,9 +107,11 @@ def create_orchestrator(
         ContextQueryService | None
     ) = None,
     response_generation_service=None,
+    task_plan_repository=None,
     execution_preparation_service=None,
     execution_query_service=None,
     execution_manifest_service=None,
+    execution_action_generator=None,
     execution_runner=None,
 ) -> Orchestrator:
     if context_query_service is None:
@@ -120,6 +122,11 @@ def create_orchestrator(
     if response_generation_service is None:
         response_generation_service = (
             FakeResponseGenerationService()
+        )
+
+    if task_plan_repository is None:
+        task_plan_repository = (
+            TaskPlanRepository(database)
         )
 
     project = ProjectRepository(
@@ -164,14 +171,14 @@ def create_orchestrator(
             response_generation_service
         ),
         task_plan_repository=(
-            TaskPlanRepository(database)
+            task_plan_repository
         ),
         approval_service=ApprovalService(
             task_repository=TaskRepository(
                 database
             ),
-            plan_repository=TaskPlanRepository(
-                database
+            plan_repository=(
+                task_plan_repository
             ),
             approval_repository=(
                 TaskApprovalRepository(
@@ -196,6 +203,9 @@ def create_orchestrator(
         ),
         execution_manifest_service=(
             execution_manifest_service
+        ),
+        execution_action_generator=(
+            execution_action_generator
         ),
         execution_runner=execution_runner,
     )
@@ -2351,3 +2361,156 @@ def test_confirm_manifest_requires_exact_syntax(
         )
 
         manifest_service.confirm.assert_not_called()
+
+def test_generates_execution_manifest_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        plan_repository = Mock()
+        query_service = Mock()
+        action_generator = Mock()
+        execution_runner = Mock()
+
+        execution = SimpleNamespace(
+            id=5,
+            task_id=3,
+            plan_id=7,
+            status=SimpleNamespace(
+                value="prepared"
+            ),
+        )
+
+        plan = SimpleNamespace(
+            id=7,
+            task_id=3,
+        )
+
+        manifest = SimpleNamespace(
+            id=11,
+            execution_id=5,
+            version=2,
+            manifest_hash="a" * 64,
+            action_count=4,
+            destructive_action_count=2,
+            status=SimpleNamespace(
+                value="pending_confirmation"
+            ),
+        )
+
+        query_service.get_by_task_id.return_value = (
+            SimpleNamespace(
+                execution=execution,
+                attempts=(),
+                steps=(),
+            )
+        )
+
+        plan_repository.get_by_id.return_value = (
+            plan
+        )
+
+        action_generator.generate.return_value = (
+            SimpleNamespace(
+                manifest=manifest,
+                actions=(
+                    SimpleNamespace(),
+                    SimpleNamespace(),
+                    SimpleNamespace(),
+                    SimpleNamespace(),
+                ),
+                model="modelo-de-prueba",
+                elapsed_seconds=1.25,
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            task_plan_repository=(
+                plan_repository
+            ),
+            execution_query_service=(
+                query_service
+            ),
+            execution_action_generator=(
+                action_generator
+            ),
+            execution_runner=(
+                execution_runner
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/generar_manifiesto 3",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:550"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "MANIFIESTO GENERADO"
+        )
+        assert "Tarea: #3" in outgoing.text
+        assert "Ejecucion: #5" in outgoing.text
+        assert "Plan aprobado: #7" in outgoing.text
+        assert "Manifiesto: #11" in outgoing.text
+        assert "Version: 2" in outgoing.text
+        assert ("a" * 64) in outgoing.text
+        assert "Acciones: 4" in outgoing.text
+        assert (
+            "/ver_manifiesto 3"
+            in outgoing.text
+        )
+        assert (
+            "No se ha ejecutado ninguna accion."
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "execution_action_generator"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == 3
+        )
+        assert (
+            outgoing.metadata["execution_id"]
+            == 5
+        )
+        assert (
+            outgoing.metadata["plan_id"]
+            == 7
+        )
+        assert (
+            outgoing.metadata["manifest_id"]
+            == 11
+        )
+        assert (
+            outgoing.metadata["manifest_hash"]
+            == "a" * 64
+        )
+
+        query_service.get_by_task_id.assert_called_once_with(
+            3
+        )
+        plan_repository.get_by_id.assert_called_once_with(
+            7
+        )
+        action_generator.generate.assert_called_once_with(
+            execution_id=5,
+            plan=plan,
+        )
+        execution_runner.run.assert_not_called()

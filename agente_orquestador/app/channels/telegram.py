@@ -78,6 +78,12 @@ class TelegramChannel:
         )
         application.add_handler(
             CommandHandler(
+                "generar_manifiesto",
+                self.handle_generate_manifest,
+            )
+        )
+        application.add_handler(
+            CommandHandler(
                 "contexto",
                 self.handle_context,
             )
@@ -357,6 +363,16 @@ class TelegramChannel:
         )
 
     async def handle_view_execution(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_generate_manifest(
         self,
         update: Update,
         context: ContextTypes.DEFAULT_TYPE,

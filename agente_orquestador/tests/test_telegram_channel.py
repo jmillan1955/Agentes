@@ -205,15 +205,6 @@ def test_formats_execution_time_in_minutes() -> None:
     assert "Respuesta generada" in text
     assert "1,18 minutos" in text
     assert "qwen2.5-coder:3b" in text
-    async def handle_confirm_manifest(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-    ) -> None:
-        await self._process_update(
-            update=update,
-            content_type=ContentType.COMMAND,
-        )
 
 def test_handle_approve_processes_command() -> None:
     channel = create_channel()
@@ -340,6 +331,29 @@ def test_cancel_execution_handler_delegates_command(
 
     asyncio.run(
         channel.handle_cancel_execution(
+            update=update,
+            context=context,
+        )
+    )
+
+    process_update.assert_awaited_once_with(
+        update=update,
+        content_type=ContentType.COMMAND,
+    )
+
+def test_generate_manifest_handler_delegates_command(
+) -> None:
+    channel = create_channel()
+
+    update = SimpleNamespace()
+    context = SimpleNamespace()
+
+    process_update = AsyncMock()
+
+    channel._process_update = process_update
+
+    asyncio.run(
+        channel.handle_generate_manifest(
             update=update,
             context=context,
         )

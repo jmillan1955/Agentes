@@ -24,6 +24,10 @@ from app.execution.service import (
     ExecutionPreparationError,
     ExecutionPreparationService,
 )
+from app.execution.action_generator import (
+    ExecutionActionGenerationError,
+    ExecutionActionGenerator,
+)
 from app.models import (
     ContentType,
     IncomingMessage,
@@ -107,6 +111,9 @@ class Orchestrator:
         execution_manifest_service: (
             ExecutionManifestService | None
         ) = None,
+        execution_action_generator: (
+            ExecutionActionGenerator | None
+        ) = None,
         execution_runner: (
             ExecutionRunner | None
         ) = None,
@@ -154,6 +161,9 @@ class Orchestrator:
         )
         self._execution_manifest_service = (
             execution_manifest_service
+        )
+        self._execution_action_generator = (
+            execution_action_generator
         )
         self._execution_runner = (
             execution_runner
@@ -489,6 +499,13 @@ class Orchestrator:
             if len(parts) > 1
             else ""
         )
+        if command == "/generar_manifiesto":
+            return (
+                self
+                ._process_generate_manifest_command(
+                    arguments
+                )
+            )
         if command == "/ver_manifiesto":
             return (
                 self
@@ -605,6 +622,8 @@ class Orchestrator:
             (
                 "Comando no reconocido.\n\n"
                 "Comandos disponibles:\n"
+                "/generar_manifiesto "
+                "<tarea_id>\n"
                 "/contexto\n"
                 "/buscar <consulta>\n"
                 "/clasificar <petición>\n"
@@ -888,6 +907,223 @@ class Orchestrator:
                 ),
                 "already_approved": (
                     result.already_approved
+                ),
+            },
+        )
+
+    def _process_generate_manifest_command(
+        self,
+        arguments: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        route = (
+            "execution_action_generator"
+        )
+
+        if not arguments:
+            return (
+                (
+                    "Debes indicar la tarea cuyo "
+                    "manifiesto quieres generar."
+                    "\n\nEjemplo:\n"
+                    "/generar_manifiesto 4"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "missing_task_id"
+                    ),
+                },
+            )
+
+        parts = arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la tarea."
+                    "\n\nEjemplo:\n"
+                    "/generar_manifiesto 4"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            task_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la tarea "
+                    "debe ser un numero entero."
+                    "\n\nEjemplo:\n"
+                    "/generar_manifiesto 4"
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "invalid_task_id"
+                    ),
+                },
+            )
+
+        if (
+            self._execution_query_service
+            is None
+            or self._task_plan_repository
+            is None
+            or self._execution_action_generator
+            is None
+        ):
+            return (
+                (
+                    "El servicio de generacion de "
+                    "manifiestos no esta disponible."
+                ),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        "service_unavailable"
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        try:
+            query_result = (
+                self._execution_query_service
+                .get_by_task_id(task_id)
+            )
+
+            execution = query_result.execution
+
+            plan = (
+                self._task_plan_repository
+                .get_by_id(execution.plan_id)
+            )
+
+            if plan is None:
+                raise (
+                    ExecutionActionGenerationError(
+                        "No existe el plan asociado "
+                        "a la ejecucion"
+                    )
+                )
+
+            if plan.task_id != execution.task_id:
+                raise (
+                    ExecutionActionGenerationError(
+                        "El plan no pertenece a la "
+                        "tarea de la ejecucion"
+                    )
+                )
+
+            generation_result = (
+                self
+                ._execution_action_generator
+                .generate(
+                    execution_id=execution.id,
+                    plan=plan,
+                )
+            )
+
+        except (
+            ExecutionQueryError,
+            ExecutionActionGenerationError,
+            ExecutionManifestConfirmationError,
+        ) as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "manifest_error": (
+                        type(error).__name__
+                    ),
+                    "task_id": task_id,
+                },
+            )
+
+        manifest = generation_result.manifest
+
+        lines = [
+            "MANIFIESTO GENERADO",
+            "",
+            f"Tarea: #{execution.task_id}",
+            f"Ejecucion: #{execution.id}",
+            f"Plan aprobado: #{plan.id}",
+            f"Manifiesto: #{manifest.id}",
+            f"Version: {manifest.version}",
+            (
+                "Hash: "
+                f"{manifest.manifest_hash}"
+            ),
+            (
+                "Acciones: "
+                f"{manifest.action_count}"
+            ),
+            (
+                "Acciones destructivas: "
+                f"{manifest.destructive_action_count}"
+            ),
+            (
+                "Modelo: "
+                f"{generation_result.model}"
+            ),
+            (
+                "Tiempo de generacion: "
+                f"{generation_result.elapsed_seconds:.2f} "
+                "segundos"
+            ),
+            "",
+            (
+                "Revisa todas las acciones con:"
+            ),
+            f"/ver_manifiesto {task_id}",
+            "",
+            (
+                "El manifiesto queda pendiente "
+                "de confirmacion."
+            ),
+            (
+                "No se ha ejecutado ninguna accion."
+            ),
+        ]
+
+        return (
+            "\n".join(lines),
+            {
+                "route": route,
+                "task_id": execution.task_id,
+                "execution_id": execution.id,
+                "plan_id": plan.id,
+                "manifest_id": manifest.id,
+                "manifest_version": (
+                    manifest.version
+                ),
+                "manifest_hash": (
+                    manifest.manifest_hash
+                ),
+                "action_count": (
+                    manifest.action_count
+                ),
+                "destructive_action_count": (
+                    manifest
+                    .destructive_action_count
+                ),
+                "generation_model": (
+                    generation_result.model
+                ),
+                "generation_elapsed_seconds": (
+                    generation_result
+                    .elapsed_seconds
                 ),
             },
         )

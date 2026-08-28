@@ -381,6 +381,10 @@ def main() -> None:
             execution_manifest_service=(
                 execution_runtime.manifest_service
             ),
+            execution_action_generator=(
+                execution_runtime
+                .action_generator
+            ),
             execution_runner=(
                 execution_runtime.runner
             ),
