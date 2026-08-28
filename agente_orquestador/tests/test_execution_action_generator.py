@@ -32,14 +32,20 @@ class FakeLanguageProvider:
         self._response_text = response_text
         self.prompt: str | None = None
         self.system_prompt: str | None = None
-
+        self.response_format: (
+            str | None
+        ) = None
     def generate(
         self,
         prompt: str,
         system_prompt: str | None = None,
+        response_format: str | None = None,
     ) -> LanguageResponse:
         self.prompt = prompt
         self.system_prompt = system_prompt
+        self.response_format = (
+            response_format
+        )
 
         return LanguageResponse(
             text=self._response_text,
@@ -228,6 +234,7 @@ def test_generates_and_persists_manifest() -> None:
     )
 
     assert provider.system_prompt is not None
+    assert provider.response_format == "json"
     assert "JSON" in provider.system_prompt
     assert provider.prompt is not None
     assert (

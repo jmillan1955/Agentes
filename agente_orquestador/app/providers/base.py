@@ -20,5 +20,6 @@ class LanguageProvider(Protocol):
         self,
         prompt: str,
         system_prompt: str | None = None,
+        response_format: str | None = None,
     ) -> LanguageResponse:
         """Genera una respuesta de lenguaje."""

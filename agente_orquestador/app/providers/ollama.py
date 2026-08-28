@@ -56,6 +56,7 @@ class OllamaProvider:
         self,
         prompt: str,
         system_prompt: str | None = None,
+        response_format: str | None = None,
     ) -> LanguageResponse:
         clean_prompt = prompt.strip()
 
@@ -64,6 +65,20 @@ class OllamaProvider:
                 "prompt no puede estar vacío"
             )
 
+        clean_response_format = None
+
+        if response_format is not None:
+            clean_response_format = (
+                response_format
+                .strip()
+                .lower()
+            )
+
+            if clean_response_format != "json":
+                raise ValueError(
+                    "response_format solamente "
+                    "admite json"
+                )
         payload = {
             "model": self._model,
             "messages": [
@@ -88,7 +103,10 @@ class OllamaProvider:
                 "temperature": 0.2,
             },
         }
-
+        if clean_response_format is not None:
+            payload["format"] = (
+                clean_response_format
+            )
         timeout = httpx.Timeout(
             connect=10.0,
             read=self._timeout_seconds,

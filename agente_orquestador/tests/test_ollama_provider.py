@@ -217,3 +217,48 @@ def test_removes_internal_thinking(
     assert "Razonamiento interno" not in (
         response.text
     )
+
+def test_requests_native_json_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+
+    def fake_post(
+        url: str,
+        json: dict,
+        timeout: httpx.Timeout,
+    ) -> FakeResponse:
+        calls.append(json)
+
+        return FakeResponse(
+            {
+                "message": {
+                    "content": (
+                        '{"actions": []}'
+                    )
+                },
+                "done": True,
+            }
+        )
+
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        fake_post,
+    )
+
+    provider = OllamaProvider(
+        base_url="http://127.0.0.1:11434",
+        model="qwen2.5-coder:3b",
+    )
+
+    response = provider.generate(
+        prompt="Genera un objeto JSON",
+        response_format="json",
+    )
+
+    assert response.text == (
+        '{"actions": []}'
+    )
+    assert len(calls) == 1
+    assert calls[0]["format"] == "json"
