@@ -42,6 +42,12 @@ from app.execution.query import (
 from app.execution.manifest_service import (
     ExecutionManifestService,
 )
+from app.execution.action_generator import (
+    ExecutionActionGenerator,
+)
+from app.providers.base import (
+    LanguageProvider,
+)
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
@@ -50,12 +56,14 @@ class ExecutionRuntime:
     )
     query_service: ExecutionQueryService
     manifest_service: ExecutionManifestService
+    action_generator: ExecutionActionGenerator
     runner: ExecutionRunner
     sandbox_enabled: bool
 
 
 def create_execution_runtime(
     database: ContextDatabase,
+    language_provider: LanguageProvider,
     execution_workspace_root: Path,
     protected_project_root: Path,
     sandbox_gateway_url: str | None,
@@ -122,6 +130,18 @@ def create_execution_runtime(
             manifest_repository=(
                 manifest_repository
             ),
+        )
+    )
+
+    action_generator = (
+        ExecutionActionGenerator(
+            language_provider=(
+                language_provider
+            ),
+            manifest_service=(
+                manifest_service
+            ),
+            limits=limits,
         )
     )
 
@@ -202,6 +222,7 @@ def create_execution_runtime(
         ),
         query_service=query_service,
         manifest_service=manifest_service,
+        action_generator=action_generator,
         runner=runner,
         sandbox_enabled=(
             sandbox_executor is not None

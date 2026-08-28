@@ -781,6 +781,7 @@ def test_approves_task_plan_with_command(
         execution_runtime = (
             create_execution_runtime(
                 database=database,
+                language_provider=Mock(),
                 execution_workspace_root=(
                     tmp_path / "executions"
                 ),

@@ -303,6 +303,9 @@ def main() -> None:
         execution_runtime = (
             create_execution_runtime(
                 database=database,
+                language_provider=(
+                    coding_language_provider
+                ),
                 execution_workspace_root=(
                     settings
                     .execution_workspace_root

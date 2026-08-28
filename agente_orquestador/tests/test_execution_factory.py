@@ -19,6 +19,10 @@ from app.execution.query import (
 from app.execution.manifest_service import (
     ExecutionManifestService,
 )
+from unittest.mock import Mock
+from app.execution.action_generator import (
+    ExecutionActionGenerator,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -28,6 +32,7 @@ def test_creates_runtime_without_gateway(
     ) as database:
         runtime = create_execution_runtime(
             database=database,
+            language_provider=Mock(),
             execution_workspace_root=(
                 tmp_path / "executions"
             ),
@@ -58,6 +63,10 @@ def test_creates_runtime_without_gateway(
             ExecutionManifestService,
         )
         assert isinstance(
+            runtime.action_generator,
+            ExecutionActionGenerator,
+        )
+        assert isinstance(
             runtime.runner,
             ExecutionRunner,
         )
@@ -72,6 +81,7 @@ def test_creates_runtime_with_gateway(
     ) as database:
         runtime = create_execution_runtime(
             database=database,
+            language_provider=Mock(),
             execution_workspace_root=(
                 tmp_path / "executions"
             ),
@@ -129,6 +139,7 @@ def test_rejects_incomplete_gateway_configuration(
         ):
             create_execution_runtime(
                 database=database,
+                language_provider=Mock(),
                 execution_workspace_root=(
                     tmp_path / "executions"
                 ),
