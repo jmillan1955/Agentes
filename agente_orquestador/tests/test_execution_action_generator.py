@@ -253,6 +253,15 @@ def test_generates_and_persists_manifest() -> None:
         "Crear solamente suma/suma.py"
         in provider.system_prompt
     )
+    assert (
+        "exactamente una unica propiedad: "
+        "actions"
+        in provider.system_prompt
+    )
+    assert (
+        '{"actions": [...]}'
+        in provider.system_prompt
+    )
 @pytest.mark.parametrize(
     "unsafe_path",
     (
@@ -612,7 +621,21 @@ def test_retries_invalid_model_response(
             1
         ].kwargs["prompt"]
     )
+    correction_prompt = (
+        provider.generate.call_args_list[
+            1
+        ].kwargs["prompt"]
+    )
 
+    assert (
+        "exactamente una unica propiedad: "
+        "actions"
+        in correction_prompt
+    )
+    assert (
+        '{"actions": [...]}'
+        in correction_prompt
+    )
     manifest_service.create.assert_called_once_with(
         execution_id=5,
         actions=result.actions,

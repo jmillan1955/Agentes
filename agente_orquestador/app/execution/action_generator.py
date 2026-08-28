@@ -199,14 +199,18 @@ class ExecutionActionGenerator:
     @staticmethod
     def _build_system_prompt() -> str:
         return (
-            "Eres un generador seguro de "
-            "acciones de ejecucion.\n"
             "Devuelve exclusivamente un objeto "
             "JSON valido.\n"
             "No utilices Markdown, comentarios "
             "ni texto adicional.\n"
-            "El objeto debe contener solamente "
-            "la propiedad actions.\n"
+            "La raiz del objeto JSON debe tener "
+            "exactamente una unica propiedad: "
+            "actions.\n"
+            "No incluyas propiedades como status, "
+            "message, explanation, reasoning, "
+            "summary ni ninguna otra.\n"
+            "El formato obligatorio de la raiz es: "
+            '{"actions": [...]}\n'
             "Cada accion debe contener: "
             "step_number, name, action_type, "
             "relative_path y content.\n"
@@ -324,6 +328,14 @@ class ExecutionActionGenerator:
             "y exporta expresamente esa funcion, "
             "o coloca la funcion en un modulo "
             "del mismo nombre en la raiz.\n"
+            "La raiz del JSON corregido debe "
+            "contener exactamente una unica "
+            "propiedad: actions.\n"
+            "No incluyas status, message, "
+            "explanation, reasoning, summary "
+            "ni ninguna otra propiedad.\n"
+            "El formato obligatorio de la raiz "
+            'es: {"actions": [...]}\n'
             "Error de validacion:\n"
             f"{validation_error}\n\n"
             "Respuesta anterior no valida:\n"
