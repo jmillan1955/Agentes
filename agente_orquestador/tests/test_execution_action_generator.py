@@ -503,12 +503,12 @@ def test_retries_invalid_model_response(
             "actions": [
                 {
                     "step_number": 1,
-                    "name": "Crear raiz",
+                    "name": "Crear archivo invalido",
                     "action_type": (
-                        "create_directory"
+                        "write_text_file"
                     ),
                     "relative_path": "",
-                    "content": None,
+                    "content": "contenido",
                 },
                 {
                     "step_number": 2,
@@ -826,4 +826,58 @@ def test_retries_unresolvable_generated_import(
         ].kwargs["prompt"]
     )
 
+    manifest_service.create.assert_called_once()
+
+def test_normalizes_empty_root_directory() -> None:
+    response_text = json.dumps(
+        {
+            "actions": [
+                {
+                    "step_number": 1,
+                    "name": "Crear raiz",
+                    "action_type": (
+                        "create_directory"
+                    ),
+                    "relative_path": "",
+                    "content": None,
+                },
+                {
+                    "step_number": 2,
+                    "name": "Ejecutar pruebas",
+                    "action_type": "run_pytest",
+                    "relative_path": "tests",
+                    "content": None,
+                },
+            ]
+        }
+    )
+
+    provider = FakeLanguageProvider(
+        response_text
+    )
+    manifest_service = Mock()
+    manifest_service.create.return_value = (
+        object()
+    )
+
+    generator = ExecutionActionGenerator(
+        language_provider=provider,
+        manifest_service=manifest_service,
+        limits=ExecutionLimits(),
+    )
+
+    result = generator.generate(
+        execution_id=5,
+        plan=create_approved_plan(),
+    )
+
+    assert (
+        result.actions[0].action_type
+        == ExecutionActionType.CREATE_DIRECTORY
+    )
+    assert (
+        result.actions[0].relative_path
+        == "."
+    )
+    assert provider.prompt is not None
     manifest_service.create.assert_called_once()

@@ -674,10 +674,6 @@ class ExecutionActionGenerator:
                 "relative_path debe ser texto"
             )
 
-        self._validate_relative_path(
-            relative_path
-        )
-
         if not isinstance(
             action_type_value,
             str,
@@ -695,6 +691,17 @@ class ExecutionActionGenerator:
                 "El tipo de accion no esta "
                 "permitido"
             ) from error
+        if (
+            action_type
+            == ExecutionActionType
+            .CREATE_DIRECTORY
+            and not relative_path.strip()
+        ):
+            relative_path = "."
+
+        self._validate_relative_path(
+            relative_path
+        )
 
         if (
             content is not None
