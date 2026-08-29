@@ -82,12 +82,6 @@ class SandboxFilePayload:
             self.content_base64.strip()
         )
 
-        if not content_base64:
-            raise ValueError(
-                "content_base64 no puede "
-                "estar vacio"
-            )
-
         try:
             base64.b64decode(
                 content_base64,

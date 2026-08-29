@@ -123,3 +123,12 @@ def test_rejects_timeout_over_limit() -> None:
         request.validate(
             GatewayLimits()
         )
+
+def test_accepts_empty_file() -> None:
+    file_payload = create_file(
+        path="__init__.py",
+        content=b"",
+    )
+
+    assert file_payload.content_base64 == ""
+    assert file_payload.decode() == b""
