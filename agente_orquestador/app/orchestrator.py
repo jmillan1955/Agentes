@@ -29,6 +29,10 @@ from app.execution.action_generator import (
     ExecutionActionGenerationError,
     ExecutionActionGenerator,
 )
+from app.execution.timing import (
+    elapsed_seconds_between,
+    format_elapsed_seconds,
+)
 from app.models import (
     ContentType,
     IncomingMessage,
@@ -1129,6 +1133,38 @@ class Orchestrator:
         execution = run_result.execution
         attempt = run_result.attempt
         manifest = result.manifest
+        execution_elapsed_seconds = (
+            elapsed_seconds_between(
+                started_at=execution.started_at,
+                finished_at=execution.finished_at,
+            )
+        )
+
+        step_elapsed_seconds = tuple(
+            {
+                "step_number": step.step_number,
+                "elapsed_seconds": (
+                    elapsed_seconds_between(
+                        started_at=step.started_at,
+                        finished_at=step.finished_at,
+                    )
+                ),
+            }
+            for step in run_result.steps
+        )
+
+        step_lines = [
+            (
+                f"Paso {step.step_number}: "
+                f"{step.name} "
+                f"[{step.status.value}] - "
+                + format_elapsed_seconds(
+                    started_at=step.started_at,
+                    finished_at=step.finished_at,
+                )
+            )
+            for step in run_result.steps
+        ]
 
         lines = [
             "EJECUCION COMPLETADA",
@@ -1152,7 +1188,17 @@ class Orchestrator:
                 "Acciones ejecutadas: "
                 f"{len(result.actions)}"
             ),
+            (
+                "Tiempo total de ejecucion: "
+                + format_elapsed_seconds(
+                    started_at=execution.started_at,
+                    finished_at=execution.finished_at,
+                )
+            ),
             "",
+            *step_lines,
+            "",
+
             (
                 "La ejecucion y todos sus pasos "
                 "han quedado auditados."
@@ -1188,6 +1234,12 @@ class Orchestrator:
                 ),
                 "step_count": (
                     len(run_result.steps)
+                ),
+                                "execution_elapsed_seconds": (
+                    execution_elapsed_seconds
+                ),
+                "step_elapsed_seconds": (
+                    step_elapsed_seconds
                 ),
             },
         )

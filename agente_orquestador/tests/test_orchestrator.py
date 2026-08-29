@@ -2552,6 +2552,12 @@ def test_starts_confirmed_execution_with_command(
                         status=SimpleNamespace(
                             value="completed"
                         ),
+                        started_at=(
+                            "2026-08-29T07:00:00.100Z"
+                        ),
+                        finished_at=(
+                            "2026-08-29T07:00:01.600Z"
+                        ),
                     ),
                     attempt=SimpleNamespace(
                         id=21,
@@ -2561,10 +2567,45 @@ def test_starts_confirmed_execution_with_command(
                         ),
                     ),
                     steps=(
-                        SimpleNamespace(),
-                        SimpleNamespace(),
-                        SimpleNamespace(),
-                    ),
+                        SimpleNamespace(
+                            step_number=1,
+                            name="Crear tests",
+                            status=SimpleNamespace(
+                                value="completed"
+                            ),
+                            started_at=(
+                                "2026-08-29T07:00:00.100Z"
+                            ),
+                            finished_at=(
+                                "2026-08-29T07:00:00.110Z"
+                            ),
+                        ),
+                        SimpleNamespace(
+                            step_number=2,
+                            name="Crear suma.py",
+                            status=SimpleNamespace(
+                                value="completed"
+                            ),
+                            started_at=(
+                                "2026-08-29T07:00:00.110Z"
+                            ),
+                            finished_at=(
+                                "2026-08-29T07:00:00.130Z"
+                            ),
+                        ),
+                        SimpleNamespace(
+                            step_number=3,
+                            name="Ejecutar pytest",
+                            status=SimpleNamespace(
+                                value="completed"
+                            ),
+                            started_at=(
+                                "2026-08-29T07:00:00.130Z"
+                            ),
+                            finished_at=(
+                                "2026-08-29T07:00:01.600Z"
+                            ),
+                        ),                    ),
                 ),
             )
         )
@@ -2608,7 +2649,26 @@ def test_starts_confirmed_execution_with_command(
         assert "Acciones ejecutadas: 3" in (
             outgoing.text
         )
-
+        assert (
+            "Tiempo total de ejecucion: "
+            "1.500 s"
+            in outgoing.text
+        )
+        assert (
+            "Paso 1: Crear tests "
+            "[completed] - 0.010 s"
+            in outgoing.text
+        )
+        assert (
+            "Paso 2: Crear suma.py "
+            "[completed] - 0.020 s"
+            in outgoing.text
+        )
+        assert (
+            "Paso 3: Ejecutar pytest "
+            "[completed] - 1.470 s"
+            in outgoing.text
+        )
         assert (
             outgoing.metadata["route"]
             == "execution_start_service"
@@ -2632,6 +2692,31 @@ def test_starts_confirmed_execution_with_command(
         assert (
             outgoing.metadata["execution_status"]
             == "completed"
+        )
+        assert (
+            outgoing.metadata[
+                "execution_elapsed_seconds"
+            ]
+            == 1.5
+        )
+        assert (
+            outgoing.metadata[
+                "step_elapsed_seconds"
+            ]
+            == (
+                {
+                    "step_number": 1,
+                    "elapsed_seconds": 0.01,
+                },
+                {
+                    "step_number": 2,
+                    "elapsed_seconds": 0.02,
+                },
+                {
+                    "step_number": 3,
+                    "elapsed_seconds": 1.47,
+                },
+            )
         )
 
         start_service.start.assert_called_once_with(
