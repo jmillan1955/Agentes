@@ -56,6 +56,9 @@ from app.execution.runner import (
 from app.execution.sandbox import (
     SandboxRunResult,
 )
+from app.execution.start_service import (
+    ExecutionStartError,
+)
 class FakeResponseGenerationService:
     def generate(
         self,
@@ -135,6 +138,9 @@ def create_orchestrator(
         task_plan_repository = (
             TaskPlanRepository(database)
         )
+    from app.execution.start_service import (
+        ExecutionStartError,
+    )
 
     project = ProjectRepository(
         database
@@ -2822,3 +2828,65 @@ def test_reports_failed_sandbox_execution(
             ]
             == 0.3
         )
+
+def test_resumes_execution_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        start_service = Mock()
+
+        start_service.resume.side_effect = (
+            ExecutionStartError(
+                "La ejecucion no puede reanudarse"
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            execution_start_service=(
+                start_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/reanudar_ejecucion 3",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:reanudar-1"
+                ),
+            )
+        )
+
+        assert outgoing.text == (
+            "La ejecucion no puede reanudarse"
+        )
+        assert (
+            outgoing.metadata["route"]
+            == "execution_resume_service"
+        )
+        assert (
+            outgoing.metadata["task_id"]
+            == 3
+        )
+        assert (
+            outgoing.metadata[
+                "execution_error"
+            ]
+            == "ExecutionStartError"
+        )
+
+        start_service.resume.assert_called_once_with(
+            task_id=3,
+            requested_by_user_id="123456",
+        )
+        start_service.start.assert_not_called()

@@ -190,7 +190,12 @@ class TelegramChannel:
                 self.handle_start_execution,
             )
         )
-
+        application.add_handler(
+            CommandHandler(
+                "reanudar_ejecucion",
+                self.handle_resume_execution,
+            )
+        )
         application.add_error_handler(
             self.handle_error
         )
@@ -380,6 +385,15 @@ class TelegramChannel:
         )
 
     async def handle_start_execution(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+    async def handle_resume_execution(
         self,
         update: Update,
         context: ContextTypes.DEFAULT_TYPE,

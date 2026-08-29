@@ -259,3 +259,147 @@ def test_does_not_run_tampered_actions() -> None:
         )
 
     runner.run.assert_not_called()
+
+@pytest.mark.parametrize(
+    "execution_status",
+    (
+        ExecutionStatus.FAILED,
+        ExecutionStatus.INTERRUPTED,
+    ),
+)
+def test_resumes_failed_or_interrupted_execution(
+    execution_status: ExecutionStatus,
+) -> None:
+    (
+        service,
+        execution_repository,
+        manifest_repository,
+        runner,
+    ) = create_service()
+
+    execution = SimpleNamespace(
+        id=5,
+        task_id=3,
+        plan_id=7,
+        status=execution_status,
+    )
+    manifest = create_confirmed_manifest()
+    actions = (
+        SimpleNamespace(step_number=1),
+        SimpleNamespace(step_number=2),
+    )
+    run_result = SimpleNamespace(
+        execution=SimpleNamespace(
+            id=5,
+            task_id=3,
+            status=ExecutionStatus.COMPLETED,
+        ),
+        attempt=SimpleNamespace(
+            id=22,
+            attempt_number=2,
+        ),
+        steps=(),
+    )
+
+    execution_repository.get_by_task_id.return_value = (
+        execution
+    )
+    manifest_repository.get_latest.return_value = (
+        manifest
+    )
+    manifest_repository.load_confirmed_actions.return_value = (
+        actions
+    )
+    runner.run.return_value = run_result
+
+    result = service.resume(
+        task_id=3,
+        requested_by_user_id="123456",
+    )
+
+    assert result.manifest is manifest
+    assert result.actions == actions
+    assert result.run_result is run_result
+
+    runner.run.assert_called_once_with(
+        execution_id=5,
+        actions=actions,
+    )
+
+@pytest.mark.parametrize(
+    "execution_status",
+    (
+        ExecutionStatus.PREPARED,
+        ExecutionStatus.RUNNING,
+        ExecutionStatus.COMPLETED,
+        ExecutionStatus.CANCELLED,
+    ),
+)
+def test_rejects_resume_for_non_resumable_status(
+    execution_status: ExecutionStatus,
+) -> None:
+    (
+        service,
+        execution_repository,
+        manifest_repository,
+        runner,
+    ) = create_service()
+
+    execution_repository.get_by_task_id.return_value = (
+        SimpleNamespace(
+            id=5,
+            task_id=3,
+            status=execution_status,
+        )
+    )
+
+    with pytest.raises(
+        ExecutionStartError,
+        match=(
+            "ejecucion fallida o "
+            "interrumpida"
+        ),
+    ):
+        service.resume(
+            task_id=3,
+            requested_by_user_id="123456",
+        )
+
+    manifest_repository.get_latest.assert_not_called()
+    manifest_repository.load_confirmed_actions.assert_not_called()
+    runner.run.assert_not_called()
+
+
+def test_rejects_resume_by_other_user() -> None:
+    (
+        service,
+        execution_repository,
+        manifest_repository,
+        runner,
+    ) = create_service()
+
+    execution_repository.get_by_task_id.return_value = (
+        SimpleNamespace(
+            id=5,
+            task_id=3,
+            status=ExecutionStatus.FAILED,
+        )
+    )
+    manifest_repository.get_latest.return_value = (
+        create_confirmed_manifest()
+    )
+
+    with pytest.raises(
+        ExecutionStartError,
+        match=(
+            "Solo el usuario que confirmo "
+            "el manifiesto"
+        ),
+    ):
+        service.resume(
+            task_id=3,
+            requested_by_user_id="999999",
+        )
+
+    manifest_repository.load_confirmed_actions.assert_not_called()
+    runner.run.assert_not_called()

@@ -61,6 +61,60 @@ class ExecutionStartService:
         task_id: int,
         requested_by_user_id: str,
     ) -> ExecutionStartResult:
+        return self._run(
+            task_id=task_id,
+            requested_by_user_id=(
+                requested_by_user_id
+            ),
+            allowed_statuses=(
+                ExecutionStatus.PREPARED,
+            ),
+            missing_execution_message=(
+                "La tarea no tiene una "
+                "ejecucion preparada"
+            ),
+            invalid_status_message=(
+                "Solo puede iniciarse una "
+                "ejecucion preparada"
+            ),
+        )
+
+    def resume(
+        self,
+        task_id: int,
+        requested_by_user_id: str,
+    ) -> ExecutionStartResult:
+        return self._run(
+            task_id=task_id,
+            requested_by_user_id=(
+                requested_by_user_id
+            ),
+            allowed_statuses=(
+                ExecutionStatus.FAILED,
+                ExecutionStatus.INTERRUPTED,
+            ),
+            missing_execution_message=(
+                "La tarea no tiene una "
+                "ejecucion que reanudar"
+            ),
+            invalid_status_message=(
+                "Solo puede reanudarse una "
+                "ejecucion fallida o "
+                "interrumpida"
+            ),
+        )
+
+    def _run(
+        self,
+        task_id: int,
+        requested_by_user_id: str,
+        allowed_statuses: tuple[
+            ExecutionStatus,
+            ...,
+        ],
+        missing_execution_message: str,
+        invalid_status_message: str,
+    ) -> ExecutionStartResult:
         if task_id <= 0:
             raise ExecutionStartError(
                 "El identificador de la tarea "
@@ -84,17 +138,15 @@ class ExecutionStartService:
 
         if execution is None:
             raise ExecutionStartError(
-                "La tarea no tiene una "
-                "ejecucion preparada"
+                missing_execution_message
             )
 
         if (
             execution.status
-            != ExecutionStatus.PREPARED
+            not in allowed_statuses
         ):
             raise ExecutionStartError(
-                "Solo puede iniciarse una "
-                "ejecucion preparada"
+                invalid_status_message
             )
 
         manifest = (

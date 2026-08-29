@@ -546,6 +546,15 @@ class Orchestrator:
                     user_id=user_id,
                 )
             )
+        if command == "/reanudar_ejecucion":
+            return (
+                self
+                ._process_start_execution_command(
+                    arguments=arguments,
+                    user_id=user_id,
+                    resume=True,
+                )
+            )
         if command == "/ver_ejecucion":
             return (
                 self
@@ -940,19 +949,31 @@ class Orchestrator:
         self,
         arguments: str,
         user_id: str,
+        resume: bool = False,
     ) -> tuple[
         str,
         dict[str, object],
     ]:
-        route = "execution_start_service"
+        if resume:
+            route = "execution_resume_service"
+            operation = "reanudar"
+            command_example = (
+                "/reanudar_ejecucion 4"
+            )
+        else:
+            route = "execution_start_service"
+            operation = "iniciar"
+            command_example = (
+                "/iniciar_ejecucion 4"
+            )
 
         if not arguments:
             return (
                 (
                     "Debes indicar la tarea cuya "
-                    "ejecucion quieres iniciar."
+                    f"ejecucion quieres {operation}."
                     "\n\nEjemplo:\n"
-                    "/iniciar_ejecucion 4"
+                    f"{command_example}"
                 ),
                 {
                     "route": route,
@@ -970,7 +991,7 @@ class Orchestrator:
                     "El comando solamente admite "
                     "el identificador de la tarea."
                     "\n\nEjemplo:\n"
-                    "/iniciar_ejecucion 4"
+                    f"{command_example}"
                 ),
                 {
                     "route": route,
@@ -989,7 +1010,7 @@ class Orchestrator:
                     "El identificador de la tarea "
                     "debe ser un numero entero."
                     "\n\nEjemplo:\n"
-                    "/iniciar_ejecucion 4"
+                    f"{command_example}"
                 ),
                 {
                     "route": route,
@@ -1002,8 +1023,9 @@ class Orchestrator:
         if self._execution_start_service is None:
             return (
                 (
-                    "El servicio de inicio de "
-                    "ejecuciones no esta disponible."
+                    "El servicio de "
+                    f"{operation} ejecuciones "
+                    "no esta disponible."
                 ),
                 {
                     "route": route,
@@ -1015,13 +1037,26 @@ class Orchestrator:
             )
 
         try:
-            result = (
-                self._execution_start_service
-                .start(
-                    task_id=task_id,
-                    requested_by_user_id=user_id,
+            if resume:
+                result = (
+                    self._execution_start_service
+                    .resume(
+                        task_id=task_id,
+                        requested_by_user_id=(
+                            user_id
+                        ),
+                    )
                 )
-            )
+            else:
+                result = (
+                    self._execution_start_service
+                    .start(
+                        task_id=task_id,
+                        requested_by_user_id=(
+                            user_id
+                        ),
+                    )
+                )
 
         except ExecutionRunError as error:
             sandbox_result = (
@@ -1129,10 +1164,12 @@ class Orchestrator:
                     "task_id": task_id,
                 },
             )
+
         run_result = result.run_result
         execution = run_result.execution
         attempt = run_result.attempt
         manifest = result.manifest
+
         execution_elapsed_seconds = (
             elapsed_seconds_between(
                 started_at=execution.started_at,
@@ -1198,7 +1235,6 @@ class Orchestrator:
             "",
             *step_lines,
             "",
-
             (
                 "La ejecucion y todos sus pasos "
                 "han quedado auditados."
@@ -1229,13 +1265,10 @@ class Orchestrator:
                 "attempt_number": (
                     attempt.attempt_number
                 ),
-                "action_count": (
-                    len(result.actions)
+                "attempt_status": (
+                    attempt.status.value
                 ),
-                "step_count": (
-                    len(run_result.steps)
-                ),
-                                "execution_elapsed_seconds": (
+                "execution_elapsed_seconds": (
                     execution_elapsed_seconds
                 ),
                 "step_elapsed_seconds": (
