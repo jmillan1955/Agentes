@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 SCHEMA_SQL = """
@@ -409,6 +409,86 @@ task_execution_steps (
     )
 );
 
+CREATE TABLE IF NOT EXISTS
+task_execution_promotions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_id INTEGER NOT NULL,
+    status TEXT NOT NULL
+        DEFAULT 'pending_confirmation'
+        CHECK (
+            status IN (
+                'pending_confirmation',
+                'confirmed',
+                'applied',
+                'validated',
+                'committed',
+                'failed',
+                'rolled_back'
+            )
+        ),
+    workspace_path TEXT NOT NULL,
+    repository_root TEXT NOT NULL,
+    preview_hash TEXT NOT NULL
+        CHECK (length(preview_hash) = 64),
+    changed_file_count INTEGER NOT NULL
+        CHECK (changed_file_count > 0),
+    added_file_count INTEGER NOT NULL
+        CHECK (added_file_count >= 0),
+    modified_file_count INTEGER NOT NULL
+        CHECK (modified_file_count >= 0),
+    requested_by_user_id TEXT NOT NULL,
+    request_message_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    confirmed_by_user_id TEXT,
+    confirmation_message_id TEXT,
+    confirmation_channel TEXT,
+    test_target TEXT NOT NULL,
+    promotion_branch TEXT,
+    base_commit TEXT,
+    commit_hash TEXT,
+    sandbox_exit_code INTEGER,
+    sandbox_timed_out INTEGER
+        CHECK (
+            sandbox_timed_out IS NULL
+            OR sandbox_timed_out IN (0, 1)
+        ),
+    sandbox_duration_seconds REAL
+        CHECK (
+            sandbox_duration_seconds IS NULL
+            OR sandbox_duration_seconds >= 0
+        ),
+    sandbox_stdout_text TEXT,
+    sandbox_stderr_text TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (
+        strftime(
+            '%Y-%m-%dT%H:%M:%fZ',
+            'now'
+        )
+    ),
+    confirmed_at TEXT,
+    finished_at TEXT,
+    FOREIGN KEY (execution_id)
+        REFERENCES task_executions(id)
+        ON DELETE CASCADE,
+    CHECK (
+        changed_file_count
+        = added_file_count
+        + modified_file_count
+    ),
+    UNIQUE (
+        execution_id,
+        preview_hash
+    ),
+    UNIQUE (
+        channel,
+        request_message_id
+    ),
+    UNIQUE (
+        confirmation_channel,
+        confirmation_message_id
+    )
+);
 
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -583,6 +663,20 @@ idx_manifest_actions_manifest
 ON task_execution_manifest_actions(
     manifest_id,
     step_number
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_execution_promotions_execution
+ON task_execution_promotions(
+    execution_id,
+    created_at
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_execution_promotions_status
+ON task_execution_promotions(
+    status,
+    created_at
 );
 
 CREATE INDEX IF NOT EXISTS

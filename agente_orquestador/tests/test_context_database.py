@@ -202,7 +202,7 @@ def test_creates_task_foreign_keys() -> None:
         ) in references
 
 def test_uses_schema_version_eight() -> None:
-    assert SCHEMA_VERSION == 8
+    assert SCHEMA_VERSION == 9
 
 def test_creates_execution_columns() -> None:
     with ContextDatabase(
