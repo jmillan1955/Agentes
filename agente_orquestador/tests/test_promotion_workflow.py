@@ -387,3 +387,81 @@ def test_rejects_invalid_execution_id(
         "branch",
         "--show-current",
     ) == "main"
+
+def test_rolls_back_applied_workflow(
+    tmp_path: Path,
+) -> None:
+    repository = create_repository(
+        tmp_path / "repository"
+    )
+    workspace = create_workspace(
+        tmp_path / "workspace"
+    )
+
+    preview_service, workflow_service = (
+        create_services()
+    )
+
+    preview = preview_service.create(
+        workspace_path=workspace,
+        target_repository_root=repository,
+    )
+
+    result = (
+        workflow_service
+        .apply_to_temporary_branch(
+            execution_id=7,
+            preview=preview,
+            confirmed_preview_hash=(
+                preview.preview_hash
+            ),
+        )
+    )
+
+    assert run_git(
+        repository,
+        "branch",
+        "--show-current",
+    ).startswith("promotion/")
+
+    assert (
+        repository / "tests" / "test_suma.py"
+    ).is_file()
+
+    workflow_service.rollback(result)
+
+    assert run_git(
+        repository,
+        "branch",
+        "--show-current",
+    ) == "main"
+
+    assert run_git(
+        repository,
+        "branch",
+        "--list",
+        "promotion/*",
+    ) == ""
+
+    assert (
+        repository / "suma.py"
+    ).read_text(
+        encoding="utf-8"
+    ) == (
+        "def sumar(a, b):\n"
+        "    return a - b\n"
+    )
+
+    assert not (
+        repository / "tests" / "test_suma.py"
+    ).exists()
+
+    assert not (
+        repository / "tests"
+    ).exists()
+
+    assert run_git(
+        repository,
+        "status",
+        "--porcelain",
+    ) == ""

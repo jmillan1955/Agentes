@@ -457,3 +457,53 @@ def test_rolls_back_intermediate_failure(
         "status",
         "--porcelain",
     ) == original_status
+
+def test_rolls_back_successful_application(
+    tmp_path: Path,
+) -> None:
+    workspace = create_workspace(
+        tmp_path / "workspace"
+    )
+    repository = create_repository(
+        tmp_path / "repository"
+    )
+
+    preview_service, application_service = (
+        create_services()
+    )
+
+    preview = preview_service.create(
+        workspace_path=workspace,
+        target_repository_root=repository,
+    )
+
+    result = application_service.apply(
+        preview=preview,
+        confirmed_preview_hash=(
+            preview.preview_hash
+        ),
+    )
+
+    application_service.rollback(result)
+
+    assert (
+        repository / "modificado.py"
+    ).read_text(
+        encoding="utf-8"
+    ) == "VALOR = 1\n"
+
+    assert (
+        repository
+        / "tests"
+        / "test_nuevo.py"
+    ).exists() is False
+
+    assert (
+        repository / "tests"
+    ).exists() is False
+
+    assert run_git(
+        repository,
+        "status",
+        "--porcelain",
+    ) == ""

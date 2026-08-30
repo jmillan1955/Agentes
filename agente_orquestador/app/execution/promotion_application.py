@@ -28,6 +28,12 @@ class PromotionApplicationError(
 
 
 @dataclass(frozen=True, slots=True)
+class PromotionRollbackEntry:
+    relative_path: str
+    previous_content: bytes | None
+
+
+@dataclass(frozen=True, slots=True)
 class PromotionApplicationResult:
     repository_root: Path
     preview_hash: str
@@ -36,6 +42,10 @@ class PromotionApplicationResult:
     written_paths: tuple[str, ...]
     added_count: int
     modified_count: int
+    rollback_entries: tuple[
+        PromotionRollbackEntry,
+        ...,
+    ]
 
 
 class PromotionApplicationService:
@@ -114,7 +124,10 @@ class PromotionApplicationService:
                 "cambios para aplicar"
             )
 
-        written_paths = self._apply_changes(
+        (
+            written_paths,
+            rollback_entries,
+        ) = self._apply_changes(
             workspace=workspace,
             target_root=target_root,
             changes=current_preview.changes,
@@ -161,7 +174,124 @@ class PromotionApplicationService:
             modified_count=(
                 current_preview.modified_count
             ),
+            rollback_entries=rollback_entries,
         )
+
+    def rollback(
+        self,
+        result: PromotionApplicationResult,
+    ) -> None:
+        root = result.repository_root.resolve()
+
+        try:
+            state = self._git_inspector.inspect(
+                repository_root=root,
+                require_clean=False,
+            )
+
+        except GitRepositoryInspectionError as error:
+            raise PromotionApplicationError(
+                str(error)
+            ) from error
+
+        if (
+            state.current_branch
+            != result.branch_name
+            or state.head_commit
+            != result.head_commit
+        ):
+            raise PromotionApplicationError(
+                "La rama o el commit cambiaron "
+                "antes del rollback"
+            )
+
+        added_targets: list[Path] = []
+
+        try:
+            for entry in reversed(
+                result.rollback_entries
+            ):
+                relative = PurePosixPath(
+                    entry.relative_path
+                )
+                target = root.joinpath(
+                    *relative.parts
+                )
+
+                if (
+                    not target.resolve()
+                    .is_relative_to(root)
+                    or target.is_symlink()
+                ):
+                    raise (
+                        PromotionApplicationError(
+                            "Una ruta de rollback "
+                            "no es segura"
+                        )
+                    )
+
+                if entry.previous_content is None:
+                    if target.exists():
+                        if not target.is_file():
+                            raise (
+                                PromotionApplicationError(
+                                    "Una ruta nueva "
+                                    "ya no es un "
+                                    "archivo"
+                                )
+                            )
+
+                        target.unlink()
+
+                    added_targets.append(target)
+
+                else:
+                    if not target.parent.is_dir():
+                        raise (
+                            PromotionApplicationError(
+                                "El directorio de "
+                                "rollback no existe"
+                            )
+                        )
+
+                    self._write_atomic(
+                        target=target,
+                        content=(
+                            entry.previous_content
+                        ),
+                    )
+
+            for target in added_targets:
+                self._remove_empty_parents(
+                    parent=target.parent,
+                    target_root=root,
+                )
+
+            final_state = (
+                self._git_inspector.inspect(
+                    root
+                )
+            )
+
+        except (
+            OSError,
+            GitRepositoryInspectionError,
+        ) as error:
+            raise PromotionApplicationError(
+                "No se pudo restaurar la "
+                "promocion"
+            ) from error
+
+        if (
+            final_state.current_branch
+            != result.branch_name
+            or final_state.head_commit
+            != result.head_commit
+        ):
+            raise PromotionApplicationError(
+                "El rollback cambio la rama o "
+                "el commit"
+            )
 
     def _apply_changes(
         self,
@@ -171,7 +301,10 @@ class PromotionApplicationService:
             PromotionFileChange,
             ...,
         ],
-    ) -> tuple[str, ...]:
+    ) -> tuple[
+        tuple[str, ...],
+        tuple[PromotionRollbackEntry, ...],
+    ]:
         backups: dict[
             Path,
             bytes | None,
@@ -254,7 +387,25 @@ class PromotionApplicationService:
                 "restauro el repositorio"
             ) from error
 
-        return tuple(written_paths)
+        rollback_entries = tuple(
+            PromotionRollbackEntry(
+                relative_path=(
+                    target.relative_to(
+                        target_root
+                    ).as_posix()
+                ),
+                previous_content=(
+                    previous_content
+                ),
+            )
+            for target, previous_content
+            in backups.items()
+        )
+
+        return (
+            tuple(written_paths),
+            rollback_entries,
+        )
 
     @staticmethod
     def _read_source(
@@ -408,6 +559,23 @@ class PromotionApplicationService:
         finally:
             if temporary_path.exists():
                 temporary_path.unlink()
+
+    @staticmethod
+    def _remove_empty_parents(
+        parent: Path,
+        target_root: Path,
+    ) -> None:
+        current = parent
+
+        while current != target_root:
+            if (
+                not current.exists()
+                or any(current.iterdir())
+            ):
+                break
+
+            current.rmdir()
+            current = current.parent
 
     @staticmethod
     def _rollback(

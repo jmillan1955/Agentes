@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.execution.git_promotion import (
     GitPromotionBranch,
@@ -15,7 +16,7 @@ from app.execution.promotion_application import (
 from app.execution.promotion_models import (
     PromotionPreview,
 )
-from pathlib import Path
+
 
 class PromotionWorkflowError(
     RuntimeError
@@ -65,11 +66,11 @@ class PromotionWorkflowService:
         try:
             branch = self._branch_service.create(
                 repository_root=Path(
-                    preview
-                    .target_repository_root
+                    preview.target_repository_root
                 ),
                 branch_name=branch_name,
             )
+
         except GitPromotionError as error:
             raise PromotionWorkflowError(
                 str(error)
@@ -107,3 +108,32 @@ class PromotionWorkflowService:
             branch=branch,
             application=application,
         )
+
+    def rollback(
+        self,
+        result: PromotionWorkflowResult,
+    ) -> None:
+        try:
+            self._application_service.rollback(
+                result.application
+            )
+
+        except PromotionApplicationError as error:
+            raise PromotionWorkflowError(
+                "No se pudieron revertir los "
+                "archivos de la promocion: "
+                f"{error}"
+            ) from error
+
+        try:
+            self._branch_service.rollback(
+                result.branch
+            )
+
+        except GitPromotionError as error:
+            raise PromotionWorkflowError(
+                "Los archivos fueron revertidos, "
+                "pero no se pudo eliminar la "
+                "rama temporal: "
+                f"{error}"
+            ) from error
