@@ -221,11 +221,13 @@ class TaskExecutionPromotion:
 
         if (
             self.status
-            != PromotionStatus
-            .PENDING_CONFIRMATION
+            not in {
+                PromotionStatus
+                .PENDING_CONFIRMATION,
+                PromotionStatus.FAILED,
+            }
             and not has_complete_confirmation
-        ):
-            raise ValueError(
+        ):            raise ValueError(
                 "La promocion debe conservar "
                 "la confirmacion autorizada"
             )

@@ -16,7 +16,12 @@ from app.execution.promotion_models import (
 from app.execution.promotion_records import (
     PromotionStatus,
 )
-
+from app.execution.sandbox import (
+    SandboxRunResult,
+)
+from app.execution.promotion_commit import (
+    PromotionCommitResult,
+)
 
 def prepare_completed_execution(
     database: ContextDatabase,
@@ -631,3 +636,774 @@ def test_gets_latest_promotion(
 
         assert first.id < second.id
         assert latest == second
+
+def test_confirms_pending_promotion(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        execution_id = (
+            prepare_completed_execution(
+                database=database,
+                workspace_path=workspace,
+            )
+        )
+
+        repository = (
+            TaskExecutionPromotionRepository(
+                database
+            )
+        )
+
+        pending = create_pending(
+            repository=repository,
+            execution_id=execution_id,
+            preview=create_preview(
+                workspace_path=workspace,
+                repository_root=(
+                    tmp_path / "repository"
+                ),
+            ),
+        )
+
+        confirmed = repository.confirm(
+            promotion_id=pending.id,
+            confirmed_by_user_id="123456",
+            confirmation_message_id=(
+                "telegram:confirmacion:1"
+            ),
+            confirmation_channel="telegram",
+        )
+
+        assert (
+            confirmed.status
+            == PromotionStatus.CONFIRMED
+        )
+        assert (
+            confirmed.confirmed_by_user_id
+            == "123456"
+        )
+        assert (
+            confirmed.confirmation_message_id
+            == "telegram:confirmacion:1"
+        )
+        assert (
+            confirmed.confirmation_channel
+            == "telegram"
+        )
+        assert confirmed.confirmed_at is not None
+        assert confirmed.finished_at is None
+
+
+def test_repeats_confirmation_idempotently(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        execution_id = (
+            prepare_completed_execution(
+                database=database,
+                workspace_path=workspace,
+            )
+        )
+
+        repository = (
+            TaskExecutionPromotionRepository(
+                database
+            )
+        )
+
+        pending = create_pending(
+            repository=repository,
+            execution_id=execution_id,
+            preview=create_preview(
+                workspace_path=workspace,
+                repository_root=(
+                    tmp_path / "repository"
+                ),
+            ),
+        )
+
+        first = repository.confirm(
+            promotion_id=pending.id,
+            confirmed_by_user_id="123456",
+            confirmation_message_id=(
+                "telegram:confirmacion:1"
+            ),
+            confirmation_channel="telegram",
+        )
+
+        second = repository.confirm(
+            promotion_id=pending.id,
+            confirmed_by_user_id="123456",
+            confirmation_message_id=(
+                "telegram:confirmacion:1"
+            ),
+            confirmation_channel="telegram",
+        )
+
+        assert second == first
+
+
+def test_rejects_different_confirmation(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        execution_id = (
+            prepare_completed_execution(
+                database=database,
+                workspace_path=workspace,
+            )
+        )
+
+        repository = (
+            TaskExecutionPromotionRepository(
+                database
+            )
+        )
+
+        pending = create_pending(
+            repository=repository,
+            execution_id=execution_id,
+            preview=create_preview(
+                workspace_path=workspace,
+                repository_root=(
+                    tmp_path / "repository"
+                ),
+            ),
+        )
+
+        repository.confirm(
+            promotion_id=pending.id,
+            confirmed_by_user_id="123456",
+            confirmation_message_id=(
+                "telegram:confirmacion:1"
+            ),
+            confirmation_channel="telegram",
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="de otra forma",
+        ):
+            repository.confirm(
+                promotion_id=pending.id,
+                confirmed_by_user_id="999999",
+                confirmation_message_id=(
+                    "telegram:confirmacion:2"
+                ),
+                confirmation_channel=(
+                    "telegram"
+                ),
+            )
+
+def create_confirmed_promotion(
+    database: ContextDatabase,
+    tmp_path: Path,
+):
+    workspace = tmp_path / "workspace"
+
+    execution_id = (
+        prepare_completed_execution(
+            database=database,
+            workspace_path=workspace,
+        )
+    )
+
+    repository = (
+        TaskExecutionPromotionRepository(
+            database
+        )
+    )
+
+    pending = create_pending(
+        repository=repository,
+        execution_id=execution_id,
+        preview=create_preview(
+            workspace_path=workspace,
+            repository_root=(
+                tmp_path / "repository"
+            ),
+        ),
+    )
+
+    confirmed = repository.confirm(
+        promotion_id=pending.id,
+        confirmed_by_user_id="123456",
+        confirmation_message_id=(
+            "telegram:confirmacion:1"
+        ),
+        confirmation_channel="telegram",
+    )
+
+    return repository, confirmed
+
+def test_marks_confirmed_promotion_as_applied(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, confirmed = (
+            create_confirmed_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        applied = repository.mark_applied(
+            promotion_id=confirmed.id,
+            promotion_branch=(
+                "promotion/execution-7"
+            ),
+            base_commit="b" * 40,
+        )
+
+        assert (
+            applied.status
+            == PromotionStatus.APPLIED
+        )
+        assert (
+            applied.promotion_branch
+            == "promotion/execution-7"
+        )
+        assert applied.base_commit == "b" * 40
+        assert applied.commit_hash is None
+
+
+def test_repeats_applied_transition_idempotently(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, confirmed = (
+            create_confirmed_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        first = repository.mark_applied(
+            promotion_id=confirmed.id,
+            promotion_branch=(
+                "promotion/execution-7"
+            ),
+            base_commit="b" * 40,
+        )
+
+        second = repository.mark_applied(
+            promotion_id=confirmed.id,
+            promotion_branch=(
+                "promotion/execution-7"
+            ),
+            base_commit="b" * 40,
+        )
+
+        assert second == first
+
+
+def test_rejects_applied_before_confirmation(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        execution_id = (
+            prepare_completed_execution(
+                database=database,
+                workspace_path=workspace,
+            )
+        )
+
+        repository = (
+            TaskExecutionPromotionRepository(
+                database
+            )
+        )
+
+        pending = create_pending(
+            repository=repository,
+            execution_id=execution_id,
+            preview=create_preview(
+                workspace_path=workspace,
+                repository_root=(
+                    tmp_path / "repository"
+                ),
+            ),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="No se permite",
+        ):
+            repository.mark_applied(
+                promotion_id=pending.id,
+                promotion_branch=(
+                    "promotion/execution-7"
+                ),
+                base_commit="b" * 40,
+            )
+
+def create_applied_promotion(
+    database: ContextDatabase,
+    tmp_path: Path,
+):
+    repository, confirmed = (
+        create_confirmed_promotion(
+            database=database,
+            tmp_path=tmp_path,
+        )
+    )
+
+    applied = repository.mark_applied(
+        promotion_id=confirmed.id,
+        promotion_branch=(
+            "promotion/execution-7"
+        ),
+        base_commit="b" * 40,
+    )
+
+    return repository, applied
+
+
+def create_successful_sandbox_result(
+) -> SandboxRunResult:
+    return SandboxRunResult(
+        exit_code=0,
+        stdout_text="1 passed",
+        stderr_text="",
+        timed_out=False,
+        duration_seconds=0.25,
+    )
+
+
+def test_marks_applied_promotion_as_validated(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, applied = (
+            create_applied_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        sandbox_result = (
+            create_successful_sandbox_result()
+        )
+
+        validated = repository.mark_validated(
+            promotion_id=applied.id,
+            sandbox_result=sandbox_result,
+        )
+
+        assert (
+            validated.status
+            == PromotionStatus.VALIDATED
+        )
+        assert validated.sandbox_exit_code == 0
+        assert (
+            validated.sandbox_timed_out
+            is False
+        )
+        assert (
+            validated
+            .sandbox_duration_seconds
+            == 0.25
+        )
+        assert (
+            validated.sandbox_stdout_text
+            == "1 passed"
+        )
+        assert (
+            validated.sandbox_stderr_text
+            is None
+        )
+
+
+def test_repeats_validation_idempotently(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, applied = (
+            create_applied_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        sandbox_result = (
+            create_successful_sandbox_result()
+        )
+
+        first = repository.mark_validated(
+            promotion_id=applied.id,
+            sandbox_result=sandbox_result,
+        )
+
+        second = repository.mark_validated(
+            promotion_id=applied.id,
+            sandbox_result=sandbox_result,
+        )
+
+        assert second == first
+
+
+def test_rejects_failed_sandbox_validation(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, applied = (
+            create_applied_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        failed_result = SandboxRunResult(
+            exit_code=1,
+            stdout_text="1 failed",
+            stderr_text="AssertionError",
+            timed_out=False,
+            duration_seconds=0.30,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="pruebas satisfactorias",
+        ):
+            repository.mark_validated(
+                promotion_id=applied.id,
+                sandbox_result=failed_result,
+            )
+
+def create_validated_promotion(
+    database: ContextDatabase,
+    tmp_path: Path,
+):
+    repository, applied = (
+        create_applied_promotion(
+            database=database,
+            tmp_path=tmp_path,
+        )
+    )
+
+    validated = repository.mark_validated(
+        promotion_id=applied.id,
+        sandbox_result=(
+            create_successful_sandbox_result()
+        ),
+    )
+
+    return repository, validated
+
+
+def create_commit_result(
+    repository_root: Path,
+) -> PromotionCommitResult:
+    return PromotionCommitResult(
+        repository_root=(
+            repository_root.resolve()
+        ),
+        branch_name=(
+            "promotion/execution-7"
+        ),
+        base_commit="b" * 40,
+        commit_hash="c" * 40,
+        commit_message=(
+            "Promocionar ejecucion #7"
+        ),
+        committed_paths=(
+            "suma.py",
+            "tests/test_suma.py",
+        ),
+    )
+
+
+def test_marks_validated_promotion_as_committed(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, validated = (
+            create_validated_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        commit_result = create_commit_result(
+            tmp_path / "repository"
+        )
+
+        committed = repository.mark_committed(
+            promotion_id=validated.id,
+            commit_result=commit_result,
+        )
+
+        assert (
+            committed.status
+            == PromotionStatus.COMMITTED
+        )
+        assert committed.commit_hash == "c" * 40
+        assert committed.finished_at is not None
+        assert committed.error_message is None
+
+
+def test_repeats_committed_transition_idempotently(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, validated = (
+            create_validated_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        commit_result = create_commit_result(
+            tmp_path / "repository"
+        )
+
+        first = repository.mark_committed(
+            promotion_id=validated.id,
+            commit_result=commit_result,
+        )
+
+        second = repository.mark_committed(
+            promotion_id=validated.id,
+            commit_result=commit_result,
+        )
+
+        assert second == first
+
+
+def test_rejects_commit_from_other_branch(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, validated = (
+            create_validated_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        commit_result = PromotionCommitResult(
+            repository_root=(
+                tmp_path
+                / "repository"
+            ).resolve(),
+            branch_name=(
+                "promotion/otra-ejecucion"
+            ),
+            base_commit="b" * 40,
+            commit_hash="c" * 40,
+            commit_message=(
+                "Promocionar ejecucion #7"
+            ),
+            committed_paths=(
+                "suma.py",
+            ),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="no pertenece",
+        ):
+            repository.mark_committed(
+                promotion_id=validated.id,
+                commit_result=commit_result,
+            )
+
+def test_marks_pending_promotion_as_failed(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        execution_id = (
+            prepare_completed_execution(
+                database=database,
+                workspace_path=workspace,
+            )
+        )
+
+        repository = (
+            TaskExecutionPromotionRepository(
+                database
+            )
+        )
+
+        pending = create_pending(
+            repository=repository,
+            execution_id=execution_id,
+            preview=create_preview(
+                workspace_path=workspace,
+                repository_root=(
+                    tmp_path / "repository"
+                ),
+            ),
+        )
+
+        failed = repository.mark_failed(
+            promotion_id=pending.id,
+            error_message=(
+                "La vista previa ha caducado"
+            ),
+        )
+
+        assert (
+            failed.status
+            == PromotionStatus.FAILED
+        )
+        assert (
+            failed.error_message
+            == "La vista previa ha caducado"
+        )
+        assert failed.finished_at is not None
+        assert (
+            failed.confirmed_by_user_id
+            is None
+        )
+
+
+def test_preserves_failed_sandbox_diagnostic(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, applied = (
+            create_applied_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        sandbox_result = SandboxRunResult(
+            exit_code=1,
+            stdout_text="1 failed",
+            stderr_text="AssertionError",
+            timed_out=False,
+            duration_seconds=0.30,
+        )
+
+        failed = repository.mark_failed(
+            promotion_id=applied.id,
+            error_message=(
+                "Las pruebas fallaron"
+            ),
+            sandbox_result=sandbox_result,
+        )
+
+        assert (
+            failed.status
+            == PromotionStatus.FAILED
+        )
+        assert failed.sandbox_exit_code == 1
+        assert (
+            failed.sandbox_timed_out
+            is False
+        )
+        assert (
+            failed.sandbox_stdout_text
+            == "1 failed"
+        )
+        assert (
+            failed.sandbox_stderr_text
+            == "AssertionError"
+        )
+
+
+def test_marks_failed_promotion_as_rolled_back(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, applied = (
+            create_applied_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        failed = repository.mark_failed(
+            promotion_id=applied.id,
+            error_message=(
+                "Las pruebas fallaron"
+            ),
+        )
+
+        rolled_back = (
+            repository.mark_rolled_back(
+                promotion_id=failed.id
+            )
+        )
+
+        assert (
+            rolled_back.status
+            == PromotionStatus.ROLLED_BACK
+        )
+        assert (
+            rolled_back.error_message
+            == "Las pruebas fallaron"
+        )
+        assert rolled_back.finished_at is not None
+
+
+def test_repeats_rollback_idempotently(
+    tmp_path: Path,
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        repository, applied = (
+            create_applied_promotion(
+                database=database,
+                tmp_path=tmp_path,
+            )
+        )
+
+        failed = repository.mark_failed(
+            promotion_id=applied.id,
+            error_message=(
+                "Las pruebas fallaron"
+            ),
+        )
+
+        first = repository.mark_rolled_back(
+            promotion_id=failed.id
+        )
+        second = repository.mark_rolled_back(
+            promotion_id=failed.id
+        )
+
+        assert second == first

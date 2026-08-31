@@ -307,3 +307,28 @@ def test_rejects_partial_confirmation(
                 "2026-08-30T10:00:30.000Z"
             ),
         )
+
+def test_creates_unconfirmed_failed_promotion(
+) -> None:
+    promotion = create_promotion(
+        status=PromotionStatus.FAILED,
+        error_message=(
+            "La vista previa ha caducado"
+        ),
+        finished_at=(
+            "2026-08-31T08:00:00.000Z"
+        ),
+    )
+
+    assert (
+        promotion.status
+        == PromotionStatus.FAILED
+    )
+    assert (
+        promotion.confirmed_by_user_id
+        is None
+    )
+    assert (
+        promotion.error_message
+        == "La vista previa ha caducado"
+    )
