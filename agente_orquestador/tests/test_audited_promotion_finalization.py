@@ -100,6 +100,7 @@ def create_pending(
         repository_root=str(
             tmp_path / "repository"
         ),
+        target_subdirectory=".",
         preview_hash="a" * 64,
         test_target="tests",
         confirmed_by_user_id=None,
@@ -274,6 +275,10 @@ def test_finalizes_and_audits_promotion(
         ),
         target_repository_root=Path(
             flow.pending.repository_root
+        ),
+        target_subdirectory=(
+            flow.pending
+            .target_subdirectory
         ),
     )
 

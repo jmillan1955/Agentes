@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 SCHEMA_SQL = """
@@ -428,6 +428,8 @@ task_execution_promotions (
         ),
     workspace_path TEXT NOT NULL,
     repository_root TEXT NOT NULL,
+    target_subdirectory TEXT NOT NULL
+        DEFAULT '.',
     preview_hash TEXT NOT NULL
         CHECK (length(preview_hash) = 64),
     changed_file_count INTEGER NOT NULL
@@ -702,6 +704,32 @@ def initialize_schema(
         )
 
     connection.executescript(SCHEMA_SQL)
+
+    if current_version < 10:
+        promotion_columns = {
+            row[1]
+            for row in connection.execute(
+                """
+                PRAGMA table_info(
+                    task_execution_promotions
+                )
+                """
+            ).fetchall()
+        }
+
+        if (
+            "target_subdirectory"
+            not in promotion_columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE
+                    task_execution_promotions
+                ADD COLUMN
+                    target_subdirectory TEXT
+                    NOT NULL DEFAULT '.'
+                """
+            )
 
     connection.execute(
         f"PRAGMA user_version = {SCHEMA_VERSION}"

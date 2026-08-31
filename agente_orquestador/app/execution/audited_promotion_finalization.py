@@ -154,6 +154,10 @@ class AuditedPromotionFinalizationService:
                 target_repository_root=Path(
                     promotion.repository_root
                 ),
+                target_subdirectory=(
+                    promotion
+                    .target_subdirectory
+                ),
             )
 
         except PromotionPreviewError as error:

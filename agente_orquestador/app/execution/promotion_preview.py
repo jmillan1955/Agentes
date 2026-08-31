@@ -15,7 +15,11 @@ from app.execution.workspace_package import (
     WorkspacePackager,
     WorkspacePackagingError,
 )
-
+from app.execution.promotion_paths import (
+    PromotionPathError,
+    map_source_to_target,
+    normalize_target_subdirectory,
+)
 
 class PromotionPreviewError(
     RuntimeError
@@ -36,6 +40,7 @@ class PromotionPreviewService:
         self,
         workspace_path: Path,
         target_repository_root: Path,
+        target_subdirectory: str = ".",
     ) -> PromotionPreview:
         workspace_input = (
             workspace_path.expanduser()
@@ -58,6 +63,17 @@ class PromotionPreviewService:
 
         workspace = workspace_input.resolve()
         target_root = target_input.resolve()
+        try:
+            normalized_target_subdirectory = (
+                normalize_target_subdirectory(
+                    target_subdirectory
+                )
+            )
+
+        except PromotionPathError as error:
+            raise PromotionPreviewError(
+                str(error)
+            ) from error
 
         self._validate_roots(
             workspace=workspace,
@@ -79,9 +95,16 @@ class PromotionPreviewService:
             self._create_file_change(
                 target_root=target_root,
                 relative_path=(
-                    packaged_file.relative_path
-                ),
-                current_content=(
+                    map_source_to_target(
+                        source_relative_path=(
+                            packaged_file
+                            .relative_path
+                        ),
+                        target_subdirectory=(
+                            normalized_target_subdirectory
+                        ),
+                    )
+                ),                current_content=(
                     base64.b64decode(
                         packaged_file
                         .content_base64,
@@ -105,6 +128,9 @@ class PromotionPreviewService:
             ),
             changes=changes,
             preview_hash=preview_hash,
+            target_subdirectory=(
+                normalized_target_subdirectory
+            ),
         )
 
     @staticmethod

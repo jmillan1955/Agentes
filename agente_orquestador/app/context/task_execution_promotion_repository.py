@@ -50,6 +50,7 @@ class TaskExecutionPromotionRepository:
                 status,
                 workspace_path,
                 repository_root,
+                target_subdirectory,
                 preview_hash,
                 changed_file_count,
                 added_file_count,
@@ -99,6 +100,7 @@ class TaskExecutionPromotionRepository:
                 status,
                 workspace_path,
                 repository_root,
+                target_subdirectory,
                 preview_hash,
                 changed_file_count,
                 added_file_count,
@@ -231,7 +233,8 @@ class TaskExecutionPromotionRepository:
                     request_message_id,
                     channel,
                     test_target,
-                    repository_root
+                    repository_root,
+                    target_subdirectory
                 FROM task_execution_promotions
                 WHERE execution_id = ?
                   AND preview_hash = ?
@@ -265,6 +268,13 @@ class TaskExecutionPromotionRepository:
                         preview
                         .target_repository_root
                     )
+                    and existing_row[
+                        "target_subdirectory"
+                    ]
+                    == (
+                        preview
+                        .target_subdirectory
+                    )
                 ):
                     connection.rollback()
 
@@ -293,6 +303,7 @@ class TaskExecutionPromotionRepository:
                         status,
                         workspace_path,
                         repository_root,
+                        target_subdirectory,
                         preview_hash,
                         changed_file_count,
                         added_file_count,
@@ -314,6 +325,7 @@ class TaskExecutionPromotionRepository:
                     ?,
                     ?,
                     ?,
+                    ?,
                     ?
                 )
                 """,
@@ -323,6 +335,10 @@ class TaskExecutionPromotionRepository:
                     (
                         preview
                         .target_repository_root
+                    ),
+                    (
+                        preview
+                        .target_subdirectory
                     ),
                     preview.preview_hash,
                     preview.changed_count,
@@ -1171,6 +1187,9 @@ class TaskExecutionPromotionRepository:
             ),
             repository_root=(
                 row["repository_root"]
+            ),
+            target_subdirectory=(
+                row["target_subdirectory"]
             ),
             preview_hash=row["preview_hash"],
             changed_file_count=(

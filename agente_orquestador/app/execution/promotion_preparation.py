@@ -66,6 +66,7 @@ class PromotionPreparationService:
         requested_by_user_id: str,
         request_message_id: str,
         channel: str,
+        target_subdirectory: str = ".",
         test_target: str = ".",
     ) -> PromotionPreparationResult:
         if execution_id <= 0:
@@ -102,6 +103,9 @@ class PromotionPreparationService:
                 workspace_path=workspace_path,
                 target_repository_root=(
                     target_repository_root
+                ),
+                target_subdirectory=(
+                    target_subdirectory
                 ),
             )
 

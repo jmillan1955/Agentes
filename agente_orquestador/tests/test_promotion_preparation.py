@@ -117,6 +117,9 @@ def test_prepares_promotion_preview(
             "telegram:promocion:1"
         ),
         channel="telegram",
+        target_subdirectory=(
+            "puntuacion_padel"
+        ),
         test_target="tests",
     )
 
@@ -131,6 +134,9 @@ def test_prepares_promotion_preview(
         workspace_path=workspace,
         target_repository_root=(
             repository_root
+        ),
+        target_subdirectory=(
+            "puntuacion_padel"
         ),
     )
 

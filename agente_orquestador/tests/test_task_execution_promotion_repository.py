@@ -264,7 +264,7 @@ def test_initializes_promotion_schema(
             ).fetchone()
         )
 
-        assert version == 9
+        assert version == 10
         assert table is not None
 
 
@@ -1407,3 +1407,87 @@ def test_repeats_rollback_idempotently(
         )
 
         assert second == first
+
+def test_persists_target_subdirectory(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    repository_root = (
+        tmp_path / "repository"
+    )
+
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        execution_id = (
+            prepare_completed_execution(
+                database=database,
+                workspace_path=workspace,
+            )
+        )
+
+        repository = (
+            TaskExecutionPromotionRepository(
+                database
+            )
+        )
+
+        preview = PromotionPreview(
+            workspace_path=str(workspace),
+            target_repository_root=(
+                str(repository_root)
+            ),
+            target_subdirectory=(
+                "puntuacion_padel"
+            ),
+            changes=(
+                PromotionFileChange(
+                    relative_path=(
+                        "puntuacion_padel/"
+                        "suma.py"
+                    ),
+                    change_type=(
+                        PromotionChangeType.ADDED
+                    ),
+                    previous_sha256=None,
+                    current_sha256="a" * 64,
+                    previous_size_bytes=None,
+                    current_size_bytes=20,
+                    diff_text="diff suma",
+                ),
+            ),
+            preview_hash="b" * 64,
+        )
+
+        created = create_pending(
+            repository=repository,
+            execution_id=execution_id,
+            preview=preview,
+            request_message_id=(
+                "telegram:promocion:"
+                "subdirectorio"
+            ),
+        )
+
+        loaded = repository.get_by_id(
+            created.id
+        )
+
+        assert loaded is not None
+        assert (
+            loaded.target_subdirectory
+            == "puntuacion_padel"
+        )
+
+        latest = (
+            repository
+            .get_latest_by_execution_id(
+                execution_id
+            )
+        )
+
+        assert latest is not None
+        assert (
+            latest.target_subdirectory
+            == "puntuacion_padel"
+        )

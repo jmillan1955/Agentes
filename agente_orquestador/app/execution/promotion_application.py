@@ -19,7 +19,10 @@ from app.execution.promotion_preview import (
     PromotionPreviewError,
     PromotionPreviewService,
 )
-
+from app.execution.promotion_paths import (
+    PromotionPathError,
+    map_target_to_source,
+)
 
 class PromotionApplicationError(
     RuntimeError
@@ -96,6 +99,10 @@ class PromotionApplicationService:
                     target_repository_root=(
                         target_root
                     ),
+                    target_subdirectory=(
+                        preview
+                        .target_subdirectory
+                    ),
                 )
             )
 
@@ -130,6 +137,10 @@ class PromotionApplicationService:
         ) = self._apply_changes(
             workspace=workspace,
             target_root=target_root,
+            target_subdirectory=(
+                current_preview
+                .target_subdirectory
+            ),
             changes=current_preview.changes,
         )
 
@@ -297,6 +308,7 @@ class PromotionApplicationService:
         self,
         workspace: Path,
         target_root: Path,
+        target_subdirectory: str,
         changes: tuple[
             PromotionFileChange,
             ...,
@@ -324,13 +336,38 @@ class PromotionApplicationService:
                 relative = PurePosixPath(
                     change.relative_path
                 )
+
+                try:
+                    source_relative_path = (
+                        map_target_to_source(
+                            target_relative_path=(
+                                change
+                                .relative_path
+                            ),
+                            target_subdirectory=(
+                                target_subdirectory
+                            ),
+                        )
+                    )
+
+                except PromotionPathError as error:
+                    raise (
+                        PromotionApplicationError(
+                            str(error)
+                        )
+                    ) from error
+
+                source_relative = (
+                    PurePosixPath(
+                        source_relative_path
+                    )
+                )
                 source = workspace.joinpath(
-                    *relative.parts
+                    *source_relative.parts
                 )
                 target = target_root.joinpath(
                     *relative.parts
                 )
-
                 current_content = (
                     self._read_source(
                         source=source,

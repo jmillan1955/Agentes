@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-
+from app.execution.promotion_paths import (
+    normalize_target_subdirectory,
+)
 
 class PromotionStatus(str, Enum):
     PENDING_CONFIRMATION = (
@@ -46,6 +48,7 @@ class TaskExecutionPromotion:
     created_at: str
     confirmed_at: str | None
     finished_at: str | None
+    target_subdirectory: str = "."
 
     def __post_init__(self) -> None:
         identifiers = {
@@ -89,6 +92,12 @@ class TaskExecutionPromotion:
             str,
             str,
         ] = {}
+
+        target_subdirectory = (
+            normalize_target_subdirectory(
+                self.target_subdirectory
+            )
+        )
 
         for field_name, value in (
             required_text_fields.items()
@@ -335,4 +344,10 @@ class TaskExecutionPromotion:
             self,
             "preview_hash",
             preview_hash,
+        )
+
+        object.__setattr__(
+            self,
+            "target_subdirectory",
+            target_subdirectory,
         )

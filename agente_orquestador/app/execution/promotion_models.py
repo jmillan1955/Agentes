@@ -8,6 +8,10 @@ from pathlib import (
     PureWindowsPath,
 )
 
+from app.execution.promotion_paths import (
+    normalize_target_subdirectory,
+)
+
 
 _SHA256_PATTERN = re.compile(
     r"^[0-9a-f]{64}$"
@@ -124,7 +128,10 @@ class PromotionFileChange:
                 ),
             )
 
-            if self.previous_size_bytes is None:
+            if (
+                self.previous_size_bytes
+                is None
+            ):
                 raise ValueError(
                     "El cambio debe conservar "
                     "previous_size_bytes"
@@ -195,6 +202,7 @@ class PromotionPreview:
         ...,
     ]
     preview_hash: str
+    target_subdirectory: str = "."
 
     def __post_init__(self) -> None:
         workspace_path = (
@@ -202,6 +210,11 @@ class PromotionPreview:
         )
         target_repository_root = (
             self.target_repository_root.strip()
+        )
+        target_subdirectory = (
+            normalize_target_subdirectory(
+                self.target_subdirectory
+            )
         )
 
         if not workspace_path:
@@ -244,6 +257,22 @@ class PromotionPreview:
                 "SHA-256 valido"
             )
 
+        if target_subdirectory != ".":
+            prefix = (
+                f"{target_subdirectory}/"
+            )
+
+            if not all(
+                change.relative_path.startswith(
+                    prefix
+                )
+                for change in self.changes
+            ):
+                raise ValueError(
+                    "Los cambios no pertenecen "
+                    "al subdirectorio objetivo"
+                )
+
         object.__setattr__(
             self,
             "workspace_path",
@@ -253,6 +282,11 @@ class PromotionPreview:
             self,
             "target_repository_root",
             target_repository_root,
+        )
+        object.__setattr__(
+            self,
+            "target_subdirectory",
+            target_subdirectory,
         )
 
     @property

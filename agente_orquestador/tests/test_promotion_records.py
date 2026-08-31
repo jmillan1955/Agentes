@@ -4,6 +4,9 @@ from app.execution.promotion_records import (
     PromotionStatus,
     TaskExecutionPromotion,
 )
+from app.execution.promotion_paths import (
+    normalize_target_subdirectory,
+)
 
 
 def create_promotion(
