@@ -74,6 +74,12 @@ from app.execution.start_service import (
     ExecutionStartError,
     ExecutionStartService,
 )
+from app.execution.promotion_preparation import (
+    PromotionPreparationService,
+)
+from app.execution.audited_promotion_finalization import (
+    AuditedPromotionFinalizationService,
+)
 
 class Orchestrator:
     def __init__(
@@ -129,6 +135,13 @@ class Orchestrator:
         execution_runner: (
             ExecutionRunner | None
         ) = None,
+        promotion_preparation_service: (
+            PromotionPreparationService | None
+        ) = None,
+        promotion_finalization_service: (
+            AuditedPromotionFinalizationService
+            | None
+        ) = None,
     ) -> None:
         self._project_id = project_id
         self._session_repository = session_repository
@@ -183,7 +196,12 @@ class Orchestrator:
         self._execution_runner = (
             execution_runner
         )
-
+        self._promotion_preparation_service = (
+            promotion_preparation_service
+        )
+        self._promotion_finalization_service = (
+            promotion_finalization_service
+        )
 
     def process(
         self,

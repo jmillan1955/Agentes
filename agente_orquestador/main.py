@@ -392,7 +392,16 @@ def main() -> None:
             execution_runner=(
                 execution_runtime.runner
             ),
+            promotion_preparation_service=(
+                execution_runtime
+                .promotion_preparation_service
+            ),
+            promotion_finalization_service=(
+                execution_runtime
+                .promotion_finalization_service
+            ),
         )
+
         transcription_service = (
             TranscriptionService(
                 model_name=(
