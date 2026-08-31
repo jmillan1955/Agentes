@@ -29,6 +29,12 @@ from app.execution.start_service import (
 from app.execution.split_action_generator import (
     SplitExecutionActionGenerator,
 )
+from app.execution.audited_promotion_finalization import (
+    AuditedPromotionFinalizationService,
+)
+from app.execution.promotion_preparation import (
+    PromotionPreparationService,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -84,6 +90,16 @@ def test_creates_runtime_without_gateway(
             runtime.runner,
             ExecutionRunner,
         )
+        assert isinstance(
+            runtime
+            .promotion_preparation_service,
+            PromotionPreparationService,
+        )
+        assert (
+            runtime
+            .promotion_finalization_service
+            is None
+        )
         assert runtime.sandbox_enabled is False
 
 
@@ -113,7 +129,16 @@ def test_creates_runtime_with_gateway(
                 150
             ),
         )
-
+        assert isinstance(
+            runtime
+            .promotion_preparation_service,
+            PromotionPreparationService,
+        )
+        assert isinstance(
+            runtime
+            .promotion_finalization_service,
+            AuditedPromotionFinalizationService,
+        )
         assert runtime.sandbox_enabled is True
 
 

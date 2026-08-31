@@ -7,19 +7,56 @@ from app.context import (
     ContextDatabase,
     TaskApprovalRepository,
     TaskExecutionAttemptRepository,
+    TaskExecutionManifestRepository,
+    TaskExecutionPromotionRepository,
     TaskExecutionRepository,
     TaskExecutionStepRepository,
     TaskRepository,
-    TaskExecutionManifestRepository,
+)
+from app.execution.action_generator import (
+    ExecutionActionGenerator,
+)
+from app.execution.audited_promotion_finalization import (
+    AuditedPromotionFinalizationService,
 )
 from app.execution.filesystem_executor import (
     SafeFilesystemExecutor,
+)
+from app.execution.git_promotion import (
+    GitPromotionBranchService,
+)
+from app.execution.git_repository import (
+    GitRepositoryInspector,
 )
 from app.execution.http_sandbox_backend import (
     HttpSandboxBackend,
 )
 from app.execution.limits import (
     ExecutionLimits,
+)
+from app.execution.manifest_service import (
+    ExecutionManifestService,
+)
+from app.execution.promotion_application import (
+    PromotionApplicationService,
+)
+from app.execution.promotion_commit import (
+    PromotionCommitService,
+)
+from app.execution.promotion_preparation import (
+    PromotionPreparationService,
+)
+from app.execution.promotion_preview import (
+    PromotionPreviewService,
+)
+from app.execution.promotion_validation import (
+    PromotionValidationService,
+)
+from app.execution.promotion_workflow import (
+    PromotionWorkflowService,
+)
+from app.execution.query import (
+    ExecutionQueryService,
 )
 from app.execution.runner import (
     ExecutionRunner,
@@ -30,30 +67,23 @@ from app.execution.sandbox_executor import (
 from app.execution.service import (
     ExecutionPreparationService,
 )
+from app.execution.split_action_generator import (
+    SplitExecutionActionGenerator,
+)
+from app.execution.start_service import (
+    ExecutionStartService,
+)
 from app.execution.workspace import (
     WorkspacePolicy,
 )
 from app.execution.workspace_package import (
     WorkspacePackager,
 )
-from app.execution.query import (
-    ExecutionQueryService,
-)
-from app.execution.manifest_service import (
-    ExecutionManifestService,
-)
-from app.execution.action_generator import (
-    ExecutionActionGenerator,
-)
 from app.providers.base import (
     LanguageProvider,
 )
-from app.execution.start_service import (
-    ExecutionStartService,
-)
-from app.execution.split_action_generator import (
-    SplitExecutionActionGenerator,
-)
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
     preparation_service: (
@@ -64,6 +94,13 @@ class ExecutionRuntime:
     action_generator: ExecutionActionGenerator
     start_service: ExecutionStartService
     runner: ExecutionRunner
+    promotion_preparation_service: (
+        PromotionPreparationService
+    )
+    promotion_finalization_service: (
+        AuditedPromotionFinalizationService
+        | None
+    )
     sandbox_enabled: bool
 
 
@@ -94,6 +131,7 @@ def create_execution_runtime(
     )
 
     limits = ExecutionLimits()
+    workspace_packager = WorkspacePackager()
 
     execution_repository = (
         TaskExecutionRepository(
@@ -121,6 +159,12 @@ def create_execution_runtime(
 
     manifest_repository = (
         TaskExecutionManifestRepository(
+            database
+        )
+    )
+
+    promotion_repository = (
+        TaskExecutionPromotionRepository(
             database
         )
     )
@@ -168,7 +212,34 @@ def create_execution_runtime(
         )
     )
 
+    git_inspector = (
+        GitRepositoryInspector()
+    )
+
+    promotion_preview_service = (
+        PromotionPreviewService(
+            workspace_packager=(
+                workspace_packager
+            )
+        )
+    )
+
+    promotion_preparation_service = (
+        PromotionPreparationService(
+            execution_repository=(
+                execution_repository
+            ),
+            preview_service=(
+                promotion_preview_service
+            ),
+            promotion_repository=(
+                promotion_repository
+            ),
+        )
+    )
+
     sandbox_executor = None
+    promotion_finalization_service = None
 
     if (
         sandbox_gateway_url is not None
@@ -177,7 +248,7 @@ def create_execution_runtime(
         backend = HttpSandboxBackend(
             gateway_url=sandbox_gateway_url,
             auth_token=sandbox_gateway_token,
-            packager=WorkspacePackager(),
+            packager=workspace_packager,
             timeout_seconds=(
                 sandbox_gateway_timeout_seconds
             ),
@@ -190,12 +261,74 @@ def create_execution_runtime(
             )
         )
 
+        promotion_application_service = (
+            PromotionApplicationService(
+                preview_service=(
+                    promotion_preview_service
+                ),
+                git_inspector=git_inspector,
+            )
+        )
+
+        promotion_branch_service = (
+            GitPromotionBranchService(
+                git_inspector=git_inspector
+            )
+        )
+
+        promotion_workflow_service = (
+            PromotionWorkflowService(
+                branch_service=(
+                    promotion_branch_service
+                ),
+                application_service=(
+                    promotion_application_service
+                ),
+            )
+        )
+
+        promotion_validation_service = (
+            PromotionValidationService(
+                workflow_service=(
+                    promotion_workflow_service
+                ),
+                sandbox_backend=backend,
+                limits=limits,
+            )
+        )
+
+        promotion_commit_service = (
+            PromotionCommitService(
+                git_inspector=git_inspector
+            )
+        )
+
+        promotion_finalization_service = (
+            AuditedPromotionFinalizationService(
+                promotion_repository=(
+                    promotion_repository
+                ),
+                preview_service=(
+                    promotion_preview_service
+                ),
+                workflow_service=(
+                    promotion_workflow_service
+                ),
+                validation_service=(
+                    promotion_validation_service
+                ),
+                commit_service=(
+                    promotion_commit_service
+                ),
+            )
+        )
+
     preparation_service = (
         ExecutionPreparationService(
             task_repository=TaskRepository(
                 database
             ),
-             approval_repository=(
+            approval_repository=(
                 approval_repository
             ),
             execution_repository=(
@@ -241,6 +374,12 @@ def create_execution_runtime(
         action_generator=action_generator,
         start_service=start_service,
         runner=runner,
+        promotion_preparation_service=(
+            promotion_preparation_service
+        ),
+        promotion_finalization_service=(
+            promotion_finalization_service
+        ),
         sandbox_enabled=(
             sandbox_executor is not None
         ),
