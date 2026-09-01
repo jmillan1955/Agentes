@@ -299,11 +299,11 @@ def main() -> None:
                 ),
                 input_cost_per_million=(
                     settings
-                    .openai_input_cost_per_million
+                    .openai_verification_input_cost_per_million
                 ),
                 output_cost_per_million=(
                     settings
-                    .openai_output_cost_per_million
+                    .openai_verification_output_cost_per_million
                 ),
                 reasoning_effort=(
                     settings
