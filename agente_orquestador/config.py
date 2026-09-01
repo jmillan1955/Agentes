@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,12 @@ class Settings:
     project_root_path: Path
     execution_workspace_root: Path
     git_repository: str | None
+
+    promotion_repository_root: Path
+    promotion_allowed_projects: tuple[
+        tuple[str, str],
+        ...,
+    ]
 
     sandbox_gateway_url: str | None
     sandbox_gateway_token: str | None
@@ -210,6 +217,110 @@ class Settings:
             "",
         ).strip()
 
+        promotion_root_value = os.getenv(
+            "PROMOTION_REPOSITORY_ROOT",
+            "..",
+        ).strip()
+
+        if not promotion_root_value:
+            raise RuntimeError(
+                "PROMOTION_REPOSITORY_ROOT no "
+                "puede estar vacio"
+            )
+
+        promotion_repository_root = Path(
+            promotion_root_value
+        )
+
+        if (
+            not promotion_repository_root
+            .is_absolute()
+        ):
+            promotion_repository_root = (
+                BASE_DIR
+                / promotion_repository_root
+            )
+
+        promotion_projects_value = os.getenv(
+            "PROMOTION_ALLOWED_PROJECTS",
+            "{}",
+        ).strip()
+
+        if not promotion_projects_value:
+            raise RuntimeError(
+                "PROMOTION_ALLOWED_PROJECTS debe "
+                "ser un objeto JSON"
+            )
+
+        try:
+            promotion_projects_data = (
+                json.loads(
+                    promotion_projects_value
+                )
+            )
+
+        except json.JSONDecodeError as error:
+            raise RuntimeError(
+                "PROMOTION_ALLOWED_PROJECTS debe "
+                "ser un objeto JSON valido"
+            ) from error
+
+        if not isinstance(
+            promotion_projects_data,
+            dict,
+        ):
+            raise RuntimeError(
+                "PROMOTION_ALLOWED_PROJECTS debe "
+                "ser un objeto JSON"
+            )
+
+        promotion_allowed_projects: list[
+            tuple[str, str]
+        ] = []
+
+        for (
+            target_project_name,
+            target_subdirectory,
+        ) in promotion_projects_data.items():
+            if (
+                not isinstance(
+                    target_project_name,
+                    str,
+                )
+                or not isinstance(
+                    target_subdirectory,
+                    str,
+                )
+            ):
+                raise RuntimeError(
+                    "PROMOTION_ALLOWED_PROJECTS "
+                    "debe relacionar nombres y "
+                    "subdirectorios de texto"
+                )
+
+            normalized_name = (
+                target_project_name.strip()
+            )
+            normalized_subdirectory = (
+                target_subdirectory.strip()
+            )
+
+            if (
+                not normalized_name
+                or not normalized_subdirectory
+            ):
+                raise RuntimeError(
+                    "PROMOTION_ALLOWED_PROJECTS "
+                    "no admite valores vacios"
+                )
+
+            promotion_allowed_projects.append(
+                (
+                    normalized_name,
+                    normalized_subdirectory,
+                )
+            )
+
         ollama_base_url = os.getenv(
             "OLLAMA_BASE_URL",
             "http://127.0.0.1:11434",
@@ -370,8 +481,17 @@ class Settings:
             git_repository=(
                 git_repository or None
             ),
-                        sandbox_gateway_url=(
-            sandbox_gateway_url_value
+            promotion_repository_root=(
+                promotion_repository_root
+                .resolve()
+            ),
+            promotion_allowed_projects=(
+                tuple(
+                    promotion_allowed_projects
+                )
+            ),
+            sandbox_gateway_url=(
+                sandbox_gateway_url_value
                 or None
             ),
             sandbox_gateway_token=(

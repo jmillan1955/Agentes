@@ -340,4 +340,63 @@ def test_rejects_unsafe_test_target(
 
     assert backend.requests == []
 
+    workflow_service.rollback.assert_called_once_with(
+        workflow_result
+    )
+
+def test_validates_only_project_subdirectory(
+    tmp_path: Path,
+) -> None:
+    workflow_service = Mock()
+    backend = FakeSandboxBackend(
+        result=create_successful_result()
+    )
+
+    project_directory = (
+        tmp_path / "puntuacion_padel"
+    )
+    project_directory.mkdir()
+
+    unrelated_directory = (
+        tmp_path / "otro_proyecto"
+    )
+    unrelated_directory.mkdir()
+
+    service = PromotionValidationService(
+        workflow_service=workflow_service,
+        sandbox_backend=backend,
+        limits=ExecutionLimits(),
+    )
+
+    workflow_result = (
+        create_workflow_result(tmp_path)
+    )
+
+    result = service.validate(
+        workflow_result=workflow_result,
+        test_target="tests",
+        target_subdirectory=(
+            "puntuacion_padel"
+        ),
+    )
+
+    assert result.test_target == "tests"
+    assert len(backend.requests) == 1
+
+    request = backend.requests[0]
+
+    assert (
+        request.workspace_path
+        == project_directory.resolve()
+    )
+    assert (
+        request.workspace_path
+        != tmp_path.resolve()
+    )
+    assert (
+        request.workspace_path
+        != unrelated_directory.resolve()
+    )
+    assert request.test_target == "tests"
+
     workflow_service.rollback.assert_not_called()

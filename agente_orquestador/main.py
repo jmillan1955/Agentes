@@ -323,6 +323,14 @@ def main() -> None:
                     settings
                     .sandbox_gateway_timeout_seconds
                 ),
+                promotion_repository_root=(
+                    settings
+                    .promotion_repository_root
+                ),
+                promotion_allowed_projects=(
+                    settings
+                    .promotion_allowed_projects
+                ),
             )
         )
 
@@ -399,6 +407,10 @@ def main() -> None:
             promotion_finalization_service=(
                 execution_runtime
                 .promotion_finalization_service
+            ),
+            promotion_target_resolver=(
+                execution_runtime
+                .promotion_target_resolver
             ),
         )
 

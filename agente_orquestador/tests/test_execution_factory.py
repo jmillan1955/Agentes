@@ -35,6 +35,9 @@ from app.execution.audited_promotion_finalization import (
 from app.execution.promotion_preparation import (
     PromotionPreparationService,
 )
+from app.execution.promotion_target import (
+    PromotionTargetResolver,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -101,6 +104,10 @@ def test_creates_runtime_without_gateway(
             is None
         )
         assert runtime.sandbox_enabled is False
+        assert (
+            runtime.promotion_target_resolver
+            is None
+        )
 
 
 def test_creates_runtime_with_gateway(
@@ -128,6 +135,15 @@ def test_creates_runtime_with_gateway(
             sandbox_gateway_timeout_seconds=(
                 150
             ),
+            promotion_repository_root=(
+                tmp_path / "Agentes"
+            ),
+            promotion_allowed_projects=(
+                (
+                    "puntuacion_padel",
+                    "puntuacion_padel",
+                ),
+            ),
         )
         assert isinstance(
             runtime
@@ -138,6 +154,10 @@ def test_creates_runtime_with_gateway(
             runtime
             .promotion_finalization_service,
             AuditedPromotionFinalizationService,
+        )
+        assert isinstance(
+            runtime.promotion_target_resolver,
+            PromotionTargetResolver,
         )
         assert runtime.sandbox_enabled is True
 

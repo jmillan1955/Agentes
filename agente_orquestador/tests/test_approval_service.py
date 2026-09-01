@@ -1,6 +1,7 @@
 import pytest
 
 from app.approvals.service import (
+    ApprovalError,
     ApprovalPermissionError,
     ApprovalService,
     ApprovalValidationError,
@@ -620,3 +621,30 @@ def test_cancels_prepared_execution_atomically(
             stored_execution.finished_at
             is not None
         )
+
+def test_allows_configured_promotion_approver(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        service = create_service(database)
+
+        service.ensure_approver(
+            APPROVER_USER_ID
+        )
+
+
+def test_rejects_unauthorized_promotion_approver(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        service = create_service(database)
+
+        with pytest.raises(
+            ApprovalPermissionError,
+            match="confirmar promociones",
+        ):
+            service.ensure_approver(
+                "999999"
+            )

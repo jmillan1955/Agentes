@@ -119,6 +119,23 @@ class TelegramChannel:
 
         application.add_handler(
             CommandHandler(
+                "preparar_promocion",
+                self.handle_prepare_promotion,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
+                "confirmar_promocion",
+                (
+                    self
+                    .handle_confirm_promotion
+                ),
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
                 "buscar",
                 self.handle_search,
             )
@@ -464,6 +481,28 @@ class TelegramChannel:
         )
 
     async def handle_prepare_execution(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_prepare_promotion(
+        self,
+        update: Update,
+        context: (
+            ContextTypes.DEFAULT_TYPE
+        ),
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_confirm_promotion(
         self,
         update: Update,
         context: ContextTypes.DEFAULT_TYPE,

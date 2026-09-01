@@ -503,3 +503,138 @@ def test_rejects_invalid_gateway_timeout(
         ),
     ):
         Settings.load()
+
+def test_loads_promotion_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    repository_root = (
+        tmp_path / "Agentes"
+    )
+
+    monkeypatch.setenv(
+        "PROMOTION_REPOSITORY_ROOT",
+        str(repository_root),
+    )
+    monkeypatch.setenv(
+        "PROMOTION_ALLOWED_PROJECTS",
+        (
+            '{"puntuacion_padel":'
+            '"puntuacion_padel",'
+            '"asistente_cocina":'
+            '"asistente_cocina"}'
+        ),
+    )
+
+    settings = Settings.load()
+
+    assert (
+        settings.promotion_repository_root
+        == repository_root.resolve()
+    )
+    assert (
+        settings.promotion_allowed_projects
+        == (
+            (
+                "puntuacion_padel",
+                "puntuacion_padel",
+            ),
+            (
+                "asistente_cocina",
+                "asistente_cocina",
+            ),
+        )
+    )
+
+
+def test_defaults_to_empty_promotion_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.delenv(
+        "PROMOTION_ALLOWED_PROJECTS",
+        raising=False,
+    )
+
+    settings = Settings.load()
+
+    assert (
+        settings.promotion_allowed_projects
+        == ()
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "",
+        "[]",
+        '"puntuacion_padel"',
+        "{json-invalido}",
+    ),
+)
+def test_rejects_invalid_promotion_projects(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "PROMOTION_ALLOWED_PROJECTS",
+        value,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="PROMOTION_ALLOWED_PROJECTS",
+    ):
+        Settings.load()
+
+
+def test_rejects_non_text_promotion_mapping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "PROMOTION_ALLOWED_PROJECTS",
+        (
+            '{"puntuacion_padel": 123}'
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="nombres y subdirectorios",
+    ):
+        Settings.load()
+
+
+def test_rejects_empty_promotion_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(
+        monkeypatch
+    )
+
+    monkeypatch.setenv(
+        "PROMOTION_REPOSITORY_ROOT",
+        "   ",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="PROMOTION_REPOSITORY_ROOT",
+    ):
+        Settings.load()

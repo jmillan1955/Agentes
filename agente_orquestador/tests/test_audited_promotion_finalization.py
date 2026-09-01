@@ -163,6 +163,9 @@ def configure_successful_flow(
     applied = SimpleNamespace(
         id=pending.id,
         test_target=pending.test_target,
+        target_subdirectory=(
+            pending.target_subdirectory
+        ),
     )
 
     sandbox_result = (
@@ -314,6 +317,7 @@ def test_finalizes_and_audits_promotion(
     validation_service.validate.assert_called_once_with(
         workflow_result=flow.workflow_result,
         test_target="tests",
+        target_subdirectory=".",
     )
 
     promotion_repository.mark_validated.assert_called_once_with(

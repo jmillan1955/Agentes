@@ -98,6 +98,21 @@ class ApprovalService:
             execution_repository
         )
 
+    def ensure_approver(
+        self,
+        user_id: str,
+    ) -> None:
+        normalized_user_id = user_id.strip()
+
+        if (
+            normalized_user_id
+            not in self._approver_user_ids
+        ):
+            raise ApprovalPermissionError(
+                "No tienes permiso para "
+                "confirmar promociones"
+            )
+
     def approve(
         self,
         task_id: int,

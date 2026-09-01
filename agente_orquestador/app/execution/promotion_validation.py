@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import (
+    Path,
+    PurePosixPath,
+)
 
 from app.execution.limits import (
     ExecutionLimits,
+)
+from app.execution.promotion_paths import (
+    PromotionPathError,
+    normalize_target_subdirectory,
 )
 from app.execution.promotion_workflow import (
     PromotionWorkflowError,
@@ -64,13 +72,25 @@ class PromotionValidationService:
             PromotionWorkflowResult
         ),
         test_target: str = ".",
+        target_subdirectory: str = ".",
     ) -> PromotionValidationResult:
         try:
+            validation_workspace = (
+                self._resolve_validation_workspace(
+                    repository_root=(
+                        workflow_result
+                        .branch
+                        .repository_root
+                    ),
+                    target_subdirectory=(
+                        target_subdirectory
+                    ),
+                )
+            )
+
             request = SandboxRunRequest(
                 workspace_path=(
-                    workflow_result
-                    .branch
-                    .repository_root
+                    validation_workspace
                 ),
                 test_target=test_target,
                 timeout_seconds=(
@@ -83,7 +103,16 @@ class PromotionValidationService:
                 ),
             )
 
-        except ValueError as error:
+        except (
+            PromotionPathError,
+            ValueError,
+        ) as error:
+            self._rollback_after_failure(
+                workflow_result=workflow_result,
+                original_error=error,
+                sandbox_result=None,
+            )
+
             raise PromotionValidationError(
                 "La configuracion de las pruebas "
                 f"no es valida: {error}"
@@ -139,6 +168,71 @@ class PromotionValidationService:
             sandbox_result=sandbox_result,
             test_target=request.test_target,
         )
+
+    @staticmethod
+    def _resolve_validation_workspace(
+        repository_root: Path,
+        target_subdirectory: str,
+    ) -> Path:
+        root_input = (
+            repository_root.expanduser()
+        )
+
+        if root_input.is_symlink():
+            raise PromotionPathError(
+                "El repositorio no puede ser un "
+                "enlace simbolico"
+            )
+
+        root = root_input.resolve()
+
+        if not root.is_dir():
+            raise PromotionPathError(
+                "El repositorio no existe"
+            )
+
+        normalized_subdirectory = (
+            normalize_target_subdirectory(
+                target_subdirectory
+            )
+        )
+
+        if normalized_subdirectory == ".":
+            return root
+
+        relative = PurePosixPath(
+            normalized_subdirectory
+        )
+        candidate = root.joinpath(
+            *relative.parts
+        )
+
+        current = candidate
+
+        while current != root:
+            if current.is_symlink():
+                raise PromotionPathError(
+                    "El subdirectorio contiene "
+                    "un enlace simbolico"
+                )
+
+            current = current.parent
+
+        resolved = candidate.resolve()
+
+        if not resolved.is_relative_to(root):
+            raise PromotionPathError(
+                "El subdirectorio sale del "
+                "repositorio"
+            )
+
+        if not resolved.is_dir():
+            raise PromotionPathError(
+                "El subdirectorio objetivo no "
+                "existe"
+            )
+
+        return resolved
 
     def _rollback_after_failure(
         self,

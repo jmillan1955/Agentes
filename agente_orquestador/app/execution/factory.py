@@ -82,7 +82,9 @@ from app.execution.workspace_package import (
 from app.providers.base import (
     LanguageProvider,
 )
-
+from app.execution.promotion_target import (
+    PromotionTargetResolver,
+)
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
@@ -101,6 +103,9 @@ class ExecutionRuntime:
         AuditedPromotionFinalizationService
         | None
     )
+    promotion_target_resolver: (
+        PromotionTargetResolver | None
+    )
     sandbox_enabled: bool
 
 
@@ -112,6 +117,13 @@ def create_execution_runtime(
     sandbox_gateway_url: str | None,
     sandbox_gateway_token: str | None,
     sandbox_gateway_timeout_seconds: float,
+    promotion_repository_root: (
+        Path | None
+    ) = None,
+    promotion_allowed_projects: tuple[
+        tuple[str, str],
+        ...,
+    ] = (),
 ) -> ExecutionRuntime:
     if bool(
         sandbox_gateway_url
@@ -169,6 +181,10 @@ def create_execution_runtime(
         )
     )
 
+    task_repository = TaskRepository(
+        database
+    )
+
     manifest_service = (
         ExecutionManifestService(
             execution_repository=(
@@ -215,6 +231,33 @@ def create_execution_runtime(
     git_inspector = (
         GitRepositoryInspector()
     )
+
+    promotion_target_resolver = None
+
+    if promotion_repository_root is not None:
+        promotion_target_resolver = (
+            PromotionTargetResolver(
+                execution_repository=(
+                    execution_repository
+                ),
+                task_repository=(
+                    task_repository
+                ),
+                git_inspector=git_inspector,
+                repository_root=(
+                    promotion_repository_root
+                ),
+                allowed_projects=dict(
+                    promotion_allowed_projects
+                ),
+            )
+        )
+
+    elif promotion_allowed_projects:
+        raise ValueError(
+            "No pueden configurarse proyectos "
+            "de promocion sin repositorio"
+        )
 
     promotion_preview_service = (
         PromotionPreviewService(
@@ -325,9 +368,7 @@ def create_execution_runtime(
 
     preparation_service = (
         ExecutionPreparationService(
-            task_repository=TaskRepository(
-                database
-            ),
+            task_repository=task_repository,
             approval_repository=(
                 approval_repository
             ),
@@ -379,6 +420,9 @@ def create_execution_runtime(
         ),
         promotion_finalization_service=(
             promotion_finalization_service
+        ),
+        promotion_target_resolver=(
+            promotion_target_resolver
         ),
         sandbox_enabled=(
             sandbox_executor is not None

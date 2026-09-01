@@ -59,6 +59,14 @@ from app.execution.sandbox import (
 from app.execution.start_service import (
     ExecutionStartError,
 )
+from app.execution.promotion_target import (
+    PromotionTargetResolutionError,
+    PromotionTargetResolutionError,
+)
+from app.execution.audited_promotion_finalization import (
+    AuditedPromotionFinalizationError,
+)
+
 class FakeResponseGenerationService:
     def generate(
         self,
@@ -123,6 +131,9 @@ def create_orchestrator(
     execution_action_generator=None,
     execution_start_service=None,
     execution_runner=None,
+    promotion_preparation_service=None,
+    promotion_finalization_service=None,
+    promotion_target_resolver=None,
 ) -> Orchestrator:
     if context_query_service is None:
         context_query_service = (
@@ -224,6 +235,15 @@ def create_orchestrator(
             execution_start_service
         ),
         execution_runner=execution_runner,
+        promotion_preparation_service=(
+            promotion_preparation_service
+        ),
+        promotion_finalization_service=(
+            promotion_finalization_service
+        ),
+        promotion_target_resolver=(
+            promotion_target_resolver
+        ),
     )
 
 def test_processes_text_message() -> None:
@@ -2890,3 +2910,616 @@ def test_resumes_execution_with_command(
             requested_by_user_id="123456",
         )
         start_service.start.assert_not_called()
+
+def test_prepares_promotion_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        target_resolver = Mock()
+        preparation_service = Mock()
+
+        target = SimpleNamespace(
+            execution_id=7,
+            repository_root=Path(
+                "C:/repositorio/Agentes"
+            ),
+            target_project_name=(
+                "puntuacion_padel"
+            ),
+            target_subdirectory=(
+                "puntuacion_padel"
+            ),
+            test_target=".",
+        )
+
+        preview = SimpleNamespace(
+            changed_count=2,
+            added_count=1,
+            modified_count=1,
+            preview_hash="a" * 64,
+            changes=(
+                SimpleNamespace(
+                    relative_path=(
+                        "puntuacion_padel/"
+                        "suma.py"
+                    ),
+                    change_type=(
+                        SimpleNamespace(
+                            value="added"
+                        )
+                    ),
+                ),
+                SimpleNamespace(
+                    relative_path=(
+                        "puntuacion_padel/"
+                        "tests/test_suma.py"
+                    ),
+                    change_type=(
+                        SimpleNamespace(
+                            value="modified"
+                        )
+                    ),
+                ),
+            ),
+        )
+
+        promotion = SimpleNamespace(
+            id=11,
+            status=SimpleNamespace(
+                value=(
+                    "pending_confirmation"
+                )
+            ),
+        )
+
+        target_resolver.resolve_task.return_value = (
+            target
+        )
+        preparation_service.prepare.return_value = (
+            SimpleNamespace(
+                promotion=promotion,
+                preview=preview,
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_preparation_service=(
+                preparation_service
+            ),
+            promotion_target_resolver=(
+                target_resolver
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text=(
+                    "/preparar_promocion 3"
+                ),
+                message_id=(
+                    "telegram:"
+                    "chat-123456:700"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "PROMOCION PREPARADA"
+        )
+        assert "Tarea: #3" in outgoing.text
+        assert "Ejecucion: #7" in outgoing.text
+        assert "Promocion: #11" in outgoing.text
+        assert (
+            "Proyecto objetivo: "
+            "puntuacion_padel"
+            in outgoing.text
+        )
+        assert (
+            "+ puntuacion_padel/suma.py"
+            in outgoing.text
+        )
+        assert (
+            "~ puntuacion_padel/"
+            "tests/test_suma.py"
+            in outgoing.text
+        )
+        assert (
+            "/confirmar_promocion 11"
+            in outgoing.text
+        )
+
+        target_resolver.resolve_task.assert_called_once_with(
+            3
+        )
+
+        preparation_service.prepare.assert_called_once_with(
+            execution_id=7,
+            target_repository_root=(
+                target.repository_root
+            ),
+            requested_by_user_id="123456",
+            request_message_id=(
+                "telegram:chat-123456:700"
+            ),
+            channel="telegram",
+            target_subdirectory=(
+                "puntuacion_padel"
+            ),
+            test_target=".",
+        )
+
+        assert (
+            outgoing.metadata[
+                "promotion_id"
+            ]
+            == 11
+        )
+        assert (
+            outgoing.metadata[
+                "preview_hash"
+            ]
+            == "a" * 64
+        )
+
+
+def test_prepare_promotion_requires_task_id(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        orchestrator = create_orchestrator(
+            database=database,
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id="chat",
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/preparar_promocion",
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "/preparar_promocion 4"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_error"
+            ]
+            == "missing_task_id"
+        )
+
+
+def test_reports_unauthorized_promotion_target(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        target_resolver = Mock()
+        preparation_service = Mock()
+
+        target_resolver.resolve_task.side_effect = (
+            PromotionTargetResolutionError(
+                "El proyecto objetivo no esta "
+                "autorizado para promociones"
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_preparation_service=(
+                preparation_service
+            ),
+            promotion_target_resolver=(
+                target_resolver
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=ChannelName.TELEGRAM,
+                user_id="123456",
+                conversation_id="chat",
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/preparar_promocion 3",
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "no esta autorizado"
+            in outgoing.text
+        )
+        preparation_service.prepare.assert_not_called()
+
+def test_confirms_promotion_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        finalization_service = Mock()
+
+        promotion = SimpleNamespace(
+            id=8,
+            execution_id=7,
+            status=SimpleNamespace(
+                value="committed"
+            ),
+            target_subdirectory=(
+                "puntuacion_padel"
+            ),
+            changed_file_count=2,
+            added_file_count=1,
+            modified_file_count=1,
+            promotion_branch=(
+                "promotion/execution-7"
+            ),
+            base_commit="a" * 40,
+            commit_hash="b" * 40,
+            sandbox_exit_code=0,
+            sandbox_timed_out=False,
+            sandbox_duration_seconds=1.25,
+        )
+
+        finalization_service.finalize.return_value = (
+            promotion
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_finalization_service=(
+                finalization_service
+            ),
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.COMMAND,
+            text="/confirmar_promocion 8",
+            message_id=(
+                "telegram:"
+                "chat-123456:800"
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            incoming
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "PROMOCION COMPLETADA"
+        )
+        assert "Promocion: #8" in outgoing.text
+        assert "Ejecucion: #7" in outgoing.text
+        assert (
+            "Estado: committed"
+            in outgoing.text
+        )
+        assert (
+            "Proyecto destino: "
+            "puntuacion_padel"
+            in outgoing.text
+        )
+        assert (
+            "Rama temporal: "
+            "promotion/execution-7"
+            in outgoing.text
+        )
+        assert (
+            f"Commit de promocion: {'b' * 40}"
+            in outgoing.text
+        )
+        assert (
+            "no se ha fusionado ni enviado"
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "promotion_finalization_service"
+        )
+        assert (
+            outgoing.metadata["promotion_id"]
+            == 8
+        )
+        assert (
+            outgoing.metadata["execution_id"]
+            == 7
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_status"
+            ]
+            == "committed"
+        )
+        assert (
+            outgoing.metadata[
+                "sandbox_duration_seconds"
+            ]
+            == 1.25
+        )
+
+        (
+            finalization_service
+            .finalize
+            .assert_called_once_with(
+                promotion_id=8,
+                confirmed_by_user_id=(
+                    "123456"
+                ),
+                confirmation_message_id=(
+                    "telegram:"
+                    "chat-123456:800"
+                ),
+                confirmation_channel=(
+                    "telegram"
+                ),
+            )
+        )
+
+
+def test_confirm_promotion_requires_id(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        finalization_service = Mock()
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_finalization_service=(
+                finalization_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=(
+                    ChannelName.TELEGRAM
+                ),
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/confirmar_promocion",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:801"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar la promocion"
+            in outgoing.text
+        )
+
+        (
+            finalization_service
+            .finalize
+            .assert_not_called()
+        )
+
+
+def test_rejects_unauthorized_promotion_confirmation(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        finalization_service = Mock()
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_finalization_service=(
+                finalization_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=(
+                    ChannelName.TELEGRAM
+                ),
+                user_id="999999",
+                conversation_id=(
+                    "chat-999999"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/confirmar_promocion 8",
+                message_id=(
+                    "telegram:"
+                    "chat-999999:802"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "No tienes permiso para "
+            "confirmar promociones"
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata[
+                "promotion_error"
+            ]
+            == "ApprovalPermissionError"
+        )
+
+        (
+            finalization_service
+            .finalize
+            .assert_not_called()
+        )
+
+def test_reports_failed_promotion_validation(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        finalization_service = Mock()
+
+        sandbox_result = SandboxRunResult(
+            exit_code=1,
+            stdout_text=(
+                "tests/test_sum.py::"
+                "test_sumar FAILED\n"
+            ),
+            stderr_text=(
+                "AssertionError: "
+                "resultado incorrecto\n"
+            ),
+            timed_out=False,
+            duration_seconds=2.75,
+        )
+
+        finalization_service.finalize.side_effect = (
+            AuditedPromotionFinalizationError(
+                (
+                    "La promocion no supero "
+                    "la validacion"
+                ),
+                sandbox_result=(
+                    sandbox_result
+                ),
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_finalization_service=(
+                finalization_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=(
+                    ChannelName.TELEGRAM
+                ),
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/confirmar_promocion 8",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:803"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "NO SE PUDO CONFIRMAR "
+            "LA PROMOCION"
+        )
+        assert (
+            "Promocion: #8"
+            in outgoing.text
+        )
+        assert (
+            "La promocion no supero "
+            "la validacion"
+            in outgoing.text
+        )
+        assert (
+            "Codigo de salida del "
+            "sandbox: 1"
+            in outgoing.text
+        )
+        assert (
+            "Tiempo del sandbox: "
+            "2.750 s"
+            in outgoing.text
+        )
+        assert (
+            "test_sumar FAILED"
+            in outgoing.text
+        )
+        assert (
+            "AssertionError"
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "promotion_finalization_service"
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_error"
+            ]
+            == (
+                "AuditedPromotion"
+                "FinalizationError"
+            )
+        )
+        assert (
+            outgoing.metadata[
+                "sandbox_exit_code"
+            ]
+            == 1
+        )
+        assert (
+            outgoing.metadata[
+                "sandbox_timed_out"
+            ]
+            is False
+        )
+        assert (
+            outgoing.metadata[
+                "sandbox_duration_seconds"
+            ]
+            == 2.75
+        )
+
+        (
+            finalization_service
+            .finalize
+            .assert_called_once_with(
+                promotion_id=8,
+                confirmed_by_user_id=(
+                    "123456"
+                ),
+                confirmation_message_id=(
+                    "telegram:"
+                    "chat-123456:803"
+                ),
+                confirmation_channel=(
+                    "telegram"
+                ),
+            )
+        )

@@ -288,7 +288,7 @@ class AuditedPromotionFinalizationService:
             ) from error
 
         try:
-            validation_result = (
+             validation_result = (
                 self._validation_service
                 .validate(
                     workflow_result=(
@@ -296,6 +296,10 @@ class AuditedPromotionFinalizationService:
                     ),
                     test_target=(
                         applied.test_target
+                    ),
+                    target_subdirectory=(
+                        applied
+                        .target_subdirectory
                     ),
                 )
             )
