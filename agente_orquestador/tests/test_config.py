@@ -557,7 +557,10 @@ def test_defaults_to_empty_promotion_allowlist(
     configure_required_environment(
         monkeypatch
     )
-
+    monkeypatch.setattr(
+        "config.load_dotenv",
+        lambda *_args, **_kwargs: False,
+    )
     monkeypatch.delenv(
         "PROMOTION_ALLOWED_PROJECTS",
         raising=False,
