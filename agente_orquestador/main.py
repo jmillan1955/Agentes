@@ -49,6 +49,7 @@ from app.providers import (GeminiProvider, LanguageProvider, OllamaProvider,
 from app.response_generation_service import (
     ResponseGenerationService,
 )
+from app.verification import VerificationPolicy
 from app.routing import (
     ProvisionalTaskHandler,
     RequestClassifier,
@@ -278,6 +279,51 @@ def main() -> None:
                 ),
             )
         )
+
+        verification_response_service = None
+        verification_policy = None
+        if settings.verification_enabled:
+            if settings.openai_api_key is None:
+                raise RuntimeError(
+                    "Falta OPENAI_API_KEY para "
+                    "activar la verificación"
+                )
+            verification_provider = OpenAIProvider(
+                api_key=settings.openai_api_key,
+                model=(
+                    settings
+                    .openai_verification_model
+                ),
+                timeout_seconds=(
+                    settings.openai_timeout_seconds
+                ),
+                input_cost_per_million=(
+                    settings
+                    .openai_input_cost_per_million
+                ),
+                output_cost_per_million=(
+                    settings
+                    .openai_output_cost_per_million
+                ),
+                reasoning_effort=(
+                    settings
+                    .openai_verification_reasoning_effort
+                ),
+                web_search_enabled=True,
+            )
+            verification_response_service = (
+                ResponseGenerationService(
+                    context_builder=context_builder,
+                    prompt_builder=PromptBuilder(),
+                    language_provider=(
+                        verification_provider
+                    ),
+                )
+            )
+            verification_policy = VerificationPolicy(
+                settings.verification_mode
+            )
+
         comparison_service = ProviderComparisonService({
             name: create_language_provider(settings, name)
             for name in settings.comparison_providers
@@ -395,6 +441,10 @@ def main() -> None:
                 response_generation_service
             ),
             provider_comparison_service=comparison_service,
+            verification_response_service=(
+                verification_response_service
+            ),
+            verification_policy=verification_policy,
             request_classifier=(
                 RequestClassifier()
             ),
