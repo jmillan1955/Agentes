@@ -11,7 +11,8 @@ class OpenAIProvider:
                  input_cost_per_million: float = 0.0,
                  output_cost_per_million: float = 0.0,
                  reasoning_effort: str = "minimal",
-                 web_search_enabled: bool = False) -> None:
+                 web_search_enabled: bool = False,
+                 web_search_context_size: str = "low") -> None:
         if not api_key.strip() or not model.strip() or timeout_seconds <= 0:
             raise ValueError("Configuracion OpenAI no valida")
         self._model = model.strip()
@@ -23,6 +24,15 @@ class OpenAIProvider:
             raise ValueError("Esfuerzo de razonamiento OpenAI no valido")
         self._reasoning_effort = reasoning_effort
         self._web_search_enabled = web_search_enabled
+        if web_search_context_size not in {
+            "low", "medium", "high"
+        }:
+            raise ValueError(
+                "Tamaño de contexto web no válido"
+            )
+        self._web_search_context_size = (
+            web_search_context_size
+        )
 
     def generate(self, prompt: str, system_prompt: str | None = None,
                  response_format: str | None = None) -> LanguageResponse:
@@ -47,7 +57,13 @@ class OpenAIProvider:
             }
             if self._web_search_enabled:
                 request["tools"] = [
-                    {"type": "web_search"}
+                    {
+                        "type": "web_search",
+                        "search_context_size": (
+                            self
+                            ._web_search_context_size
+                        ),
+                    }
                 ]
                 request["tool_choice"] = "required"
             response = self._client.responses.create(
