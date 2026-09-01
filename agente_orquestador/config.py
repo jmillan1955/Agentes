@@ -47,6 +47,20 @@ class Settings:
     ollama_general_model: str
     ollama_coding_model: str
     ollama_timeout_seconds: float
+    general_provider: str
+    planning_provider: str
+    comparison_providers: tuple[str, ...]
+    openai_api_key: str | None
+    openai_general_model: str
+    openai_planning_model: str
+    openai_general_reasoning_effort: str
+    openai_planning_reasoning_effort: str
+    openai_timeout_seconds: float
+    openai_input_cost_per_million: float
+    openai_output_cost_per_million: float
+    gemini_api_key: str | None
+    gemini_general_model: str
+    gemini_timeout_seconds: float
 
     whisper_model: str
 
@@ -376,6 +390,66 @@ class Settings:
                 "ser mayor que cero"
             )
 
+        supported_providers = {"ollama", "openai", "gemini"}
+        general_provider = os.getenv("GENERAL_PROVIDER", "ollama").strip().lower()
+        planning_provider = os.getenv("PLANNING_PROVIDER", "ollama").strip().lower()
+        comparison_providers = tuple(dict.fromkeys(
+            item.strip().lower()
+            for item in os.getenv("COMPARISON_PROVIDERS", "ollama").split(",")
+            if item.strip()
+        ))
+        selected = {general_provider, planning_provider, *comparison_providers}
+        unknown = selected - supported_providers
+        if unknown:
+            raise RuntimeError("Proveedor no soportado: " + ", ".join(sorted(unknown)))
+
+        openai_api_key = os.getenv("OPENAI_API_KEY", "").strip() or None
+        gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip() or None
+        if "openai" in selected and not openai_api_key:
+            raise RuntimeError("Falta OPENAI_API_KEY para usar OpenAI")
+        if "gemini" in selected and not gemini_api_key:
+            raise RuntimeError("Falta GEMINI_API_KEY para usar Gemini")
+
+        def number(name: str, default: str, allow_zero: bool = False) -> float:
+            try:
+                value = float(os.getenv(name, default).strip())
+            except ValueError as error:
+                raise RuntimeError(f"{name} debe ser un numero") from error
+            if value < 0 or (value == 0 and not allow_zero):
+                raise RuntimeError(f"{name} debe ser positivo")
+            return value
+
+        openai_general_model = os.getenv("OPENAI_GENERAL_MODEL", "gpt-5").strip()
+        openai_planning_model = os.getenv("OPENAI_PLANNING_MODEL", "gpt-5").strip()
+
+        def reasoning_effort(name: str, default: str) -> str:
+            value = os.getenv(name, default).strip().lower()
+            supported = {"minimal", "low", "medium", "high"}
+            if value not in supported:
+                raise RuntimeError(
+                    f"{name} debe ser uno de: "
+                    + ", ".join(sorted(supported))
+                )
+            return value
+
+        openai_general_reasoning_effort = reasoning_effort(
+            "OPENAI_GENERAL_REASONING_EFFORT", "minimal"
+        )
+        openai_planning_reasoning_effort = reasoning_effort(
+            "OPENAI_PLANNING_REASONING_EFFORT", "low"
+        )
+        openai_timeout_seconds = number("OPENAI_TIMEOUT_SECONDS", "120")
+        openai_input_cost_per_million = number(
+            "OPENAI_INPUT_COST_PER_MILLION", "1.25", allow_zero=True
+        )
+        openai_output_cost_per_million = number(
+            "OPENAI_OUTPUT_COST_PER_MILLION", "10", allow_zero=True
+        )
+        gemini_general_model = os.getenv(
+            "GEMINI_GENERAL_MODEL", "gemini-2.5-flash-lite"
+        ).strip()
+        gemini_timeout_seconds = number("GEMINI_TIMEOUT_SECONDS", "120")
+
         sandbox_gateway_url_value = os.getenv(
             "SANDBOX_GATEWAY_URL",
             "",
@@ -511,5 +585,19 @@ class Settings:
             ollama_timeout_seconds=(
                 ollama_timeout_seconds
             ),
+            general_provider=general_provider,
+            planning_provider=planning_provider,
+            comparison_providers=comparison_providers,
+            openai_api_key=openai_api_key,
+            openai_general_model=openai_general_model,
+            openai_planning_model=openai_planning_model,
+            openai_general_reasoning_effort=openai_general_reasoning_effort,
+            openai_planning_reasoning_effort=openai_planning_reasoning_effort,
+            openai_timeout_seconds=openai_timeout_seconds,
+            openai_input_cost_per_million=openai_input_cost_per_million,
+            openai_output_cost_per_million=openai_output_cost_per_million,
+            gemini_api_key=gemini_api_key,
+            gemini_general_model=gemini_general_model,
+            gemini_timeout_seconds=gemini_timeout_seconds,
             whisper_model=whisper_model,
         )

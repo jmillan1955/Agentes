@@ -49,6 +49,7 @@ from app.planning.service import (
 )
 from app.providers import (
     LanguageProviderError,
+    ProviderComparisonService,
 )
 from app.response_generation_service import (
     ResponseGenerationService,
@@ -103,6 +104,7 @@ class Orchestrator:
         response_generation_service: (
             ResponseGenerationService
         ),
+        provider_comparison_service: ProviderComparisonService | None = None,
         task_plan_repository: (
             TaskPlanRepository | None
         ) = None,
@@ -169,6 +171,7 @@ class Orchestrator:
         self._response_generation_service = (
             response_generation_service
         )
+        self._provider_comparison_service = provider_comparison_service
         self._task_plan_repository = task_plan_repository
         self._request_classifier = (
             request_classifier
@@ -478,6 +481,12 @@ class Orchestrator:
             metadata = {
                 "route": "language_provider",
                 "model": answer.model,
+                "provider": answer.provider,
+                "input_tokens": answer.input_tokens,
+                "output_tokens": answer.output_tokens,
+                "estimated_cost_usd": (
+                    answer.estimated_cost_usd
+                ),
                 "elapsed_seconds": (
                     answer.elapsed_seconds
                 ),
@@ -681,6 +690,14 @@ class Orchestrator:
                 {},
             )
 
+        if command == "/comparar_modelos":
+            if not arguments:
+                return ("Debes indicar una pregunta.", {"route": "provider_comparison"})
+            if self._provider_comparison_service is None:
+                return ("La comparacion no esta configurada.", {"route": "provider_comparison"})
+            text, models = self._provider_comparison_service.compare(arguments)
+            return (text, {"route": "provider_comparison", "models": models})
+
         if command == "/contexto":
             summary = (
                 self._context_query_service
@@ -746,6 +763,7 @@ class Orchestrator:
                 "/cancelar_ejecucion "
                 "<tarea_id>\n"
                 "/simple <pregunta>"
+                "\n/comparar_modelos <pregunta>"
             ),
             {},
         )

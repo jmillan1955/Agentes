@@ -13,6 +13,10 @@ class LanguageResponse:
     text: str
     model: str
     elapsed_seconds: float
+    provider: str = "unknown"
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    estimated_cost_usd: float | None = None
 
 
 class LanguageProvider(Protocol):

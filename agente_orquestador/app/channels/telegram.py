@@ -187,6 +187,9 @@ class TelegramChannel:
                 self.handle_simple,
             )
         )
+        application.add_handler(
+            CommandHandler("comparar_modelos", self.handle_compare_models)
+        )
 
         application.add_handler(
             CommandHandler(
@@ -292,6 +295,7 @@ class TelegramChannel:
             "y después una nota de voz\n"
             "/corregir_audio <texto correcto>\n"
             "/simple <pregunta>\n"
+            "/comparar_modelos <pregunta>\n"
             "/confirmar_audio"
         )
 
@@ -395,6 +399,10 @@ class TelegramChannel:
                 "No se ha podido procesar "
                 "la petición."
             )
+
+    async def handle_compare_models(self, update: Update,
+                                    context: ContextTypes.DEFAULT_TYPE) -> None:
+        await self._process_update(update=update, content_type=ContentType.COMMAND)
 
     async def handle_view_plan(
         self,
@@ -1173,6 +1181,21 @@ class TelegramChannel:
             lines.append(
                 f"🤖 Modelo: {model}"
             )
+
+        provider = outgoing.metadata.get("provider")
+        if isinstance(provider, str) and provider != "unknown":
+            lines.append(f"🔌 Proveedor: {provider}")
+
+        input_tokens = outgoing.metadata.get("input_tokens")
+        output_tokens = outgoing.metadata.get("output_tokens")
+        if isinstance(input_tokens, int) and isinstance(output_tokens, int):
+            lines.append(
+                f"🔢 Tokens: {input_tokens} entrada + {output_tokens} salida"
+            )
+
+        cost = outgoing.metadata.get("estimated_cost_usd")
+        if isinstance(cost, (int, float)):
+            lines.append(f"💵 Coste estimado: ${cost:.6f}")
 
         return "\n".join(lines)
 

@@ -44,7 +44,8 @@ from app.planning.service import (
     PlanningService,
 )
 from app.prompt_builder import PromptBuilder
-from app.providers import OllamaProvider
+from app.providers import (GeminiProvider, LanguageProvider, OllamaProvider,
+                           OpenAIProvider, ProviderComparisonService)
 from app.response_generation_service import (
     ResponseGenerationService,
 )
@@ -72,6 +73,41 @@ logging.getLogger("httpx").setLevel(
 logging.getLogger("httpcore").setLevel(
     logging.WARNING
 )
+
+
+def create_language_provider(
+    settings: Settings, provider_name: str, *, planning: bool = False
+) -> LanguageProvider:
+    if provider_name == "ollama":
+        return OllamaProvider(
+            base_url=settings.ollama_base_url,
+            model=(settings.ollama_coding_model if planning
+                   else settings.ollama_general_model),
+            timeout_seconds=settings.ollama_timeout_seconds,
+        )
+    if provider_name == "openai":
+        if settings.openai_api_key is None:
+            raise RuntimeError("Falta OPENAI_API_KEY")
+        return OpenAIProvider(
+            api_key=settings.openai_api_key,
+            model=(settings.openai_planning_model if planning
+                   else settings.openai_general_model),
+            timeout_seconds=settings.openai_timeout_seconds,
+            input_cost_per_million=settings.openai_input_cost_per_million,
+            output_cost_per_million=settings.openai_output_cost_per_million,
+            reasoning_effort=(settings.openai_planning_reasoning_effort
+                              if planning else
+                              settings.openai_general_reasoning_effort),
+        )
+    if provider_name == "gemini":
+        if settings.gemini_api_key is None:
+            raise RuntimeError("Falta GEMINI_API_KEY")
+        return GeminiProvider(
+            api_key=settings.gemini_api_key,
+            model=settings.gemini_general_model,
+            timeout_seconds=settings.gemini_timeout_seconds,
+        )
+    raise RuntimeError(f"Proveedor no soportado: {provider_name}")
 
 
 def main() -> None:
@@ -200,19 +236,8 @@ def main() -> None:
             context_search_service
         )
 
-        general_language_provider = (
-            OllamaProvider(
-                base_url=(
-                    settings.ollama_base_url
-                ),
-                model=(
-                    settings.ollama_general_model
-                ),
-                timeout_seconds=(
-                    settings
-                    .ollama_timeout_seconds
-                ),
-            )
+        general_language_provider = create_language_provider(
+            settings, settings.general_provider
         )
 
         coding_language_provider = (
@@ -231,13 +256,17 @@ def main() -> None:
         )
 
         logger.info(
-            "Modelo para consultas generales: %s",
-            settings.ollama_general_model,
+            "Proveedor para consultas generales: %s",
+            settings.general_provider,
         )
 
         logger.info(
-            "Modelo para planificaciÃ³n y cÃ³digo: %s",
-            settings.ollama_coding_model,
+            "Proveedor para planificacion: %s",
+            settings.planning_provider,
+        )
+
+        planning_language_provider = create_language_provider(
+            settings, settings.planning_provider, planning=True
         )
 
         response_generation_service = (
@@ -249,6 +278,10 @@ def main() -> None:
                 ),
             )
         )
+        comparison_service = ProviderComparisonService({
+            name: create_language_provider(settings, name)
+            for name in settings.comparison_providers
+        })
 
         planning_service = PlanningService(
             task_repository=task_repository,
@@ -262,7 +295,7 @@ def main() -> None:
                 PlanningPromptBuilder()
             ),
             language_provider=(
-                coding_language_provider
+                planning_language_provider
             ),
         )
 
@@ -361,6 +394,7 @@ def main() -> None:
             response_generation_service=(
                 response_generation_service
             ),
+            provider_comparison_service=comparison_service,
             request_classifier=(
                 RequestClassifier()
             ),
