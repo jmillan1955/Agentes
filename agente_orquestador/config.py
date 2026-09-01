@@ -62,6 +62,7 @@ class Settings:
     verification_mode: str
     openai_verification_model: str
     openai_verification_reasoning_effort: str
+    openai_web_search_context_size: str
     gemini_api_key: str | None
     gemini_general_model: str
     gemini_timeout_seconds: float
@@ -483,6 +484,17 @@ class Settings:
                 "low",
             )
         )
+        openai_web_search_context_size = os.getenv(
+            "OPENAI_WEB_SEARCH_CONTEXT_SIZE",
+            "low",
+        ).strip().lower()
+        if openai_web_search_context_size not in {
+            "low", "medium", "high"
+        }:
+            raise RuntimeError(
+                "OPENAI_WEB_SEARCH_CONTEXT_SIZE "
+                "debe ser low, medium o high"
+            )
 
         gemini_general_model = os.getenv(
             "GEMINI_GENERAL_MODEL", "gemini-2.5-flash-lite"
@@ -640,6 +652,9 @@ class Settings:
             openai_verification_model=openai_verification_model,
             openai_verification_reasoning_effort=(
                 openai_verification_reasoning_effort
+            ),
+            openai_web_search_context_size=(
+                openai_web_search_context_size
             ),
             gemini_api_key=gemini_api_key,
             gemini_general_model=gemini_general_model,
