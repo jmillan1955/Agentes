@@ -53,6 +53,8 @@ class Settings:
     openai_api_key: str | None
     openai_general_model: str
     openai_planning_model: str
+    openai_general_reasoning_effort: str
+    openai_planning_reasoning_effort: str
     openai_timeout_seconds: float
     openai_input_cost_per_million: float
     openai_output_cost_per_million: float
@@ -419,6 +421,23 @@ class Settings:
 
         openai_general_model = os.getenv("OPENAI_GENERAL_MODEL", "gpt-5").strip()
         openai_planning_model = os.getenv("OPENAI_PLANNING_MODEL", "gpt-5").strip()
+
+        def reasoning_effort(name: str, default: str) -> str:
+            value = os.getenv(name, default).strip().lower()
+            supported = {"minimal", "low", "medium", "high"}
+            if value not in supported:
+                raise RuntimeError(
+                    f"{name} debe ser uno de: "
+                    + ", ".join(sorted(supported))
+                )
+            return value
+
+        openai_general_reasoning_effort = reasoning_effort(
+            "OPENAI_GENERAL_REASONING_EFFORT", "minimal"
+        )
+        openai_planning_reasoning_effort = reasoning_effort(
+            "OPENAI_PLANNING_REASONING_EFFORT", "low"
+        )
         openai_timeout_seconds = number("OPENAI_TIMEOUT_SECONDS", "120")
         openai_input_cost_per_million = number(
             "OPENAI_INPUT_COST_PER_MILLION", "1.25", allow_zero=True
@@ -572,6 +591,8 @@ class Settings:
             openai_api_key=openai_api_key,
             openai_general_model=openai_general_model,
             openai_planning_model=openai_planning_model,
+            openai_general_reasoning_effort=openai_general_reasoning_effort,
+            openai_planning_reasoning_effort=openai_planning_reasoning_effort,
             openai_timeout_seconds=openai_timeout_seconds,
             openai_input_cost_per_million=openai_input_cost_per_million,
             openai_output_cost_per_million=openai_output_cost_per_million,

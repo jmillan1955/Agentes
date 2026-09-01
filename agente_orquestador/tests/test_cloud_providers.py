@@ -8,8 +8,10 @@ from app.providers import GeminiProvider, OpenAIProvider, ProviderComparisonServ
 
 
 def test_openai_reports_usage_and_cost(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = {}
     class FakeResponses:
         def create(self, **kwargs):
+            request.update(kwargs)
             return SimpleNamespace(
                 output_text="Respuesta OpenAI",
                 usage=SimpleNamespace(input_tokens=100, output_tokens=20),
@@ -24,6 +26,7 @@ def test_openai_reports_usage_and_cost(monkeypatch: pytest.MonkeyPatch) -> None:
     ).generate("Pregunta")
     assert result.provider == "openai"
     assert result.estimated_cost_usd == 0.000325
+    assert request["reasoning"] == {"effort": "minimal"}
 
 
 def test_gemini_reports_free_usage(monkeypatch: pytest.MonkeyPatch) -> None:

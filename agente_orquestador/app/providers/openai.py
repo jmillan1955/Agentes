@@ -9,13 +9,18 @@ from app.providers.base import LanguageProviderError, LanguageResponse
 class OpenAIProvider:
     def __init__(self, api_key: str, model: str, timeout_seconds: float = 120.0,
                  input_cost_per_million: float = 0.0,
-                 output_cost_per_million: float = 0.0) -> None:
+                 output_cost_per_million: float = 0.0,
+                 reasoning_effort: str = "minimal") -> None:
         if not api_key.strip() or not model.strip() or timeout_seconds <= 0:
             raise ValueError("Configuracion OpenAI no valida")
         self._model = model.strip()
         self._client = OpenAI(api_key=api_key.strip(), timeout=timeout_seconds)
         self._input_cost = input_cost_per_million
         self._output_cost = output_cost_per_million
+        supported_efforts = {"minimal", "low", "medium", "high"}
+        if reasoning_effort not in supported_efforts:
+            raise ValueError("Esfuerzo de razonamiento OpenAI no valido")
+        self._reasoning_effort = reasoning_effort
 
     def generate(self, prompt: str, system_prompt: str | None = None,
                  response_format: str | None = None) -> LanguageResponse:
@@ -28,6 +33,7 @@ class OpenAIProvider:
             response = self._client.responses.create(
                 model=self._model, instructions=system_prompt,
                 input=prompt.strip(),
+                reasoning={"effort": self._reasoning_effort},
                 text=({"format": {"type": "json_object"}}
                       if response_format == "json" else None),
             )

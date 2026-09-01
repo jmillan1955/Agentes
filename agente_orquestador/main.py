@@ -95,6 +95,9 @@ def create_language_provider(
             timeout_seconds=settings.openai_timeout_seconds,
             input_cost_per_million=settings.openai_input_cost_per_million,
             output_cost_per_million=settings.openai_output_cost_per_million,
+            reasoning_effort=(settings.openai_planning_reasoning_effort
+                              if planning else
+                              settings.openai_general_reasoning_effort),
         )
     if provider_name == "gemini":
         if settings.gemini_api_key is None:
