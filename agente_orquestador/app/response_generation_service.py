@@ -19,6 +19,10 @@ class GeneratedAnswer:
     message_ids: tuple[str, ...]
     context_characters: int
     context_truncated: bool
+    provider: str = "unknown"
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    estimated_cost_usd: float | None = None
 
 
 class ResponseGenerationService:
@@ -130,5 +134,11 @@ class ResponseGenerationService:
             ),
             context_truncated=(
                 context.truncated
+            ),
+            provider=response.provider,
+            input_tokens=response.input_tokens,
+            output_tokens=response.output_tokens,
+            estimated_cost_usd=(
+                response.estimated_cost_usd
             ),
         )

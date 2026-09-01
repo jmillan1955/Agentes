@@ -192,6 +192,10 @@ class OllamaProvider:
                 elapsed_seconds,
                 3,
             ),
+            provider="ollama",
+            input_tokens=data.get("prompt_eval_count"),
+            output_tokens=data.get("eval_count"),
+            estimated_cost_usd=0.0,
         )
 
     @staticmethod
