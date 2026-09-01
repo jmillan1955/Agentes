@@ -63,6 +63,8 @@ class Settings:
     openai_verification_model: str
     openai_verification_reasoning_effort: str
     openai_web_search_context_size: str
+    openai_verification_input_cost_per_million: float
+    openai_verification_output_cost_per_million: float
     gemini_api_key: str | None
     gemini_general_model: str
     gemini_timeout_seconds: float
@@ -476,7 +478,7 @@ class Settings:
             )
         openai_verification_model = os.getenv(
             "OPENAI_VERIFICATION_MODEL",
-            openai_general_model,
+            "gpt-5-mini",
         ).strip()
         openai_verification_reasoning_effort = (
             reasoning_effort(
@@ -495,6 +497,16 @@ class Settings:
                 "OPENAI_WEB_SEARCH_CONTEXT_SIZE "
                 "debe ser low, medium o high"
             )
+        openai_verification_input_cost_per_million = number(
+            "OPENAI_VERIFICATION_INPUT_COST_PER_MILLION",
+            "0.25",
+            allow_zero=True,
+        )
+        openai_verification_output_cost_per_million = number(
+            "OPENAI_VERIFICATION_OUTPUT_COST_PER_MILLION",
+            "2",
+            allow_zero=True,
+        )
 
         gemini_general_model = os.getenv(
             "GEMINI_GENERAL_MODEL", "gemini-2.5-flash-lite"
@@ -655,6 +667,12 @@ class Settings:
             ),
             openai_web_search_context_size=(
                 openai_web_search_context_size
+            ),
+            openai_verification_input_cost_per_million=(
+                openai_verification_input_cost_per_million
+            ),
+            openai_verification_output_cost_per_million=(
+                openai_verification_output_cost_per_million
             ),
             gemini_api_key=gemini_api_key,
             gemini_general_model=gemini_general_model,
