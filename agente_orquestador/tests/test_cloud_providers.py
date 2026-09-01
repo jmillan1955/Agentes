@@ -106,7 +106,10 @@ def test_openai_web_search_is_required_and_sources_are_shown(
     ).generate("Consulta actual")
 
     assert request["tools"] == [
-        {"type": "web_search"}
+        {
+            "type": "web_search",
+            "search_context_size": "low",
+        }
     ]
     assert request["tool_choice"] == "required"
     assert request["reasoning"] == {
