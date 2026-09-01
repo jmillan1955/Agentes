@@ -503,7 +503,9 @@ class Orchestrator:
                         include_context
                     ),
                     response_style=(
-                        message.metadata.get(
+                        "verified"
+                        if verified_with_web
+                        else message.metadata.get(
                             "response_style"
                         )
                     ),
@@ -609,6 +611,7 @@ class Orchestrator:
                     query=arguments,
                     current_message_id=message_id,
                     include_context=False,
+                    response_style="verified",
                 )
             )
             return (
