@@ -106,6 +106,33 @@ class ResponseGenerationService:
                 ]
             )
 
+        elif response_style == "verified":
+            prompt_query = "\n".join(
+                [
+                    (
+                        "Responde únicamente en "
+                        "español."
+                    ),
+                    (
+                        "Comprueba los hechos con "
+                        "las fuentes web disponibles."
+                    ),
+                    (
+                        "Da una respuesta cerrada, "
+                        "concreta y de máximo "
+                        "180 palabras."
+                    ),
+                    (
+                        "No hagas preguntas de "
+                        "seguimiento ni ofrezcas "
+                        "realizar más comprobaciones."
+                    ),
+                    "",
+                    "CONSULTA",
+                    query,
+                ]
+            )
+
         prompt = self._prompt_builder.build(
             query=prompt_query,
             context=context,
