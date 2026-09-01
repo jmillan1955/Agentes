@@ -70,6 +70,14 @@ class TelegramChannel:
                 self.handle_start,
             )
         )
+
+        application.add_handler(
+            CommandHandler(
+                "ver_manifiesto",
+                self.handle_view_manifest,
+            )
+        )
+
         application.add_handler(
             CommandHandler(
                 "confirmar_manifiesto",
