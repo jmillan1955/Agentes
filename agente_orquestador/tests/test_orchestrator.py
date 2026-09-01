@@ -59,8 +59,10 @@ from app.execution.sandbox import (
 from app.execution.start_service import (
     ExecutionStartError,
 )
+from app.execution.promotion_query import (
+    PromotionQueryError,
+)
 from app.execution.promotion_target import (
-    PromotionTargetResolutionError,
     PromotionTargetResolutionError,
 )
 from app.execution.audited_promotion_finalization import (
@@ -132,6 +134,7 @@ def create_orchestrator(
     execution_start_service=None,
     execution_runner=None,
     promotion_preparation_service=None,
+    promotion_query_service=None,
     promotion_finalization_service=None,
     promotion_target_resolver=None,
 ) -> Orchestrator:
@@ -237,6 +240,9 @@ def create_orchestrator(
         execution_runner=execution_runner,
         promotion_preparation_service=(
             promotion_preparation_service
+        ),
+        promotion_query_service=(
+            promotion_query_service
         ),
         promotion_finalization_service=(
             promotion_finalization_service
@@ -3522,4 +3528,267 @@ def test_reports_failed_promotion_validation(
                     "telegram"
                 ),
             )
+        )
+
+def test_views_promotion_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        query_service = Mock()
+
+        promotion = SimpleNamespace(
+            id=8,
+            execution_id=7,
+            status=SimpleNamespace(
+                value="committed"
+            ),
+            target_subdirectory=(
+                "puntuacion_padel"
+            ),
+            test_target="tests",
+            changed_file_count=2,
+            added_file_count=1,
+            modified_file_count=1,
+            preview_hash="c" * 64,
+            requested_by_user_id=(
+                "123456"
+            ),
+            created_at=(
+                "2026-09-01T08:00:00Z"
+            ),
+            confirmed_by_user_id=(
+                "123456"
+            ),
+            confirmed_at=(
+                "2026-09-01T08:01:00Z"
+            ),
+            promotion_branch=(
+                "promotion/execution-7"
+            ),
+            base_commit="a" * 40,
+            commit_hash="b" * 40,
+            sandbox_exit_code=0,
+            sandbox_timed_out=False,
+            sandbox_duration_seconds=1.25,
+            finished_at=(
+                "2026-09-01T08:01:02Z"
+            ),
+            error_message=None,
+            sandbox_stdout_text=(
+                "2 passed in 0.20s\n"
+            ),
+            sandbox_stderr_text="",
+        )
+
+        query_service.get_by_id.return_value = (
+            promotion
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_query_service=(
+                query_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=(
+                    ChannelName.TELEGRAM
+                ),
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_promocion 8",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:810"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert outgoing.text.startswith(
+            "PROMOCION #8"
+        )
+        assert (
+            "Ejecucion: #7"
+            in outgoing.text
+        )
+        assert (
+            "Estado: committed"
+            in outgoing.text
+        )
+        assert (
+            "Proyecto destino: "
+            "puntuacion_padel"
+            in outgoing.text
+        )
+        assert (
+            "Objetivo de pruebas: tests"
+            in outgoing.text
+        )
+        assert (
+            "Rama temporal: "
+            "promotion/execution-7"
+            in outgoing.text
+        )
+        assert (
+            f"Commit de promocion: {'b' * 40}"
+            in outgoing.text
+        )
+        assert (
+            "Tiempo del sandbox: "
+            "1.250 s"
+            in outgoing.text
+        )
+        assert (
+            "2 passed in 0.20s"
+            in outgoing.text
+        )
+
+        assert (
+            outgoing.metadata["route"]
+            == "promotion_query_service"
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_id"
+            ]
+            == 8
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_status"
+            ]
+            == "committed"
+        )
+
+        (
+            query_service
+            .get_by_id
+            .assert_called_once_with(8)
+        )
+
+
+def test_view_promotion_requires_id(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        query_service = Mock()
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_query_service=(
+                query_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=(
+                    ChannelName.TELEGRAM
+                ),
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_promocion",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:811"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            "Debes indicar la promocion"
+            in outgoing.text
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_error"
+            ]
+            == "missing_promotion_id"
+        )
+
+        (
+            query_service
+            .get_by_id
+            .assert_not_called()
+        )
+
+
+def test_reports_missing_promotion_with_command(
+) -> None:
+    with ContextDatabase(
+        ":memory:"
+    ) as database:
+        query_service = Mock()
+
+        query_service.get_by_id.side_effect = (
+            PromotionQueryError(
+                "No existe la promocion #99"
+            )
+        )
+
+        orchestrator = create_orchestrator(
+            database=database,
+            promotion_query_service=(
+                query_service
+            ),
+        )
+
+        outgoing = orchestrator.process(
+            IncomingMessage(
+                channel=(
+                    ChannelName.TELEGRAM
+                ),
+                user_id="123456",
+                conversation_id=(
+                    "chat-123456"
+                ),
+                content_type=(
+                    ContentType.COMMAND
+                ),
+                text="/ver_promocion 99",
+                message_id=(
+                    "telegram:"
+                    "chat-123456:812"
+                ),
+            )
+        )
+
+        assert outgoing.text is not None
+        assert (
+            outgoing.text
+            == "No existe la promocion #99"
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_error"
+            ]
+            == "PromotionQueryError"
+        )
+        assert (
+            outgoing.metadata[
+                "promotion_id"
+            ]
+            == 99
+        )
+
+        (
+            query_service
+            .get_by_id
+            .assert_called_once_with(99)
         )

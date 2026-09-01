@@ -85,6 +85,9 @@ from app.providers.base import (
 from app.execution.promotion_target import (
     PromotionTargetResolver,
 )
+from app.execution.promotion_query import (
+    PromotionQueryService,
+)
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRuntime:
@@ -98,6 +101,9 @@ class ExecutionRuntime:
     runner: ExecutionRunner
     promotion_preparation_service: (
         PromotionPreparationService
+    )
+    promotion_query_service: (
+        PromotionQueryService
     )
     promotion_finalization_service: (
         AuditedPromotionFinalizationService
@@ -178,6 +184,14 @@ def create_execution_runtime(
     promotion_repository = (
         TaskExecutionPromotionRepository(
             database
+        )
+    )
+
+    promotion_query_service = (
+        PromotionQueryService(
+            promotion_repository=(
+                promotion_repository
+            )
         )
     )
 
@@ -417,6 +431,9 @@ def create_execution_runtime(
         runner=runner,
         promotion_preparation_service=(
             promotion_preparation_service
+        ),
+        promotion_query_service=(
+            promotion_query_service
         ),
         promotion_finalization_service=(
             promotion_finalization_service

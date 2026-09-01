@@ -86,6 +86,10 @@ from app.execution.promotion_target import (
     PromotionTargetResolutionError,
     PromotionTargetResolver,
 )
+from app.execution.promotion_query import (
+    PromotionQueryError,
+    PromotionQueryService,
+)
 
 class Orchestrator:
     def __init__(
@@ -143,6 +147,9 @@ class Orchestrator:
         ) = None,
         promotion_preparation_service: (
             PromotionPreparationService | None
+        ) = None,
+        promotion_query_service: (
+            PromotionQueryService | None
         ) = None,
         promotion_finalization_service: (
             AuditedPromotionFinalizationService
@@ -207,6 +214,9 @@ class Orchestrator:
         )
         self._promotion_preparation_service = (
             promotion_preparation_service
+        )
+        self._promotion_query_service = (
+            promotion_query_service
         )
         self._promotion_finalization_service = (
             promotion_finalization_service
@@ -592,6 +602,13 @@ class Orchestrator:
                     arguments
                 )
             )
+        if command == "/ver_promocion":
+            return (
+                self
+                ._process_view_promotion_command(
+                    arguments
+                )
+            )
         if command == "/ver_plan":
             return self._process_view_plan_command(
                 arguments
@@ -701,6 +718,9 @@ class Orchestrator:
 
         return (
             (
+                "/preparar_promocion <tarea_id>\n"
+                "/ver_promocion <promocion_id>\n"
+                "/confirmar_promocion <promocion_id>\n"
                 "Comando no reconocido.\n\n"
                 "Comandos disponibles:\n"
                 "/generar_manifiesto "
@@ -2435,6 +2455,356 @@ class Orchestrator:
                 ),
                 "modified_file_count": (
                     preview.modified_count
+                ),
+            },
+        )
+
+    def _process_view_promotion_command(
+        self,
+        arguments: str,
+    ) -> tuple[
+        str,
+        dict[str, object],
+    ]:
+        route = "promotion_query_service"
+
+        normalized_arguments = (
+            arguments.strip()
+        )
+
+        if not normalized_arguments:
+            return (
+                (
+                    "Debes indicar la promocion "
+                    "que quieres consultar.\n\n"
+                    "Ejemplo:\n"
+                    "/ver_promocion 1"
+                ),
+                {
+                    "route": route,
+                    "promotion_error": (
+                        "missing_promotion_id"
+                    ),
+                },
+            )
+
+        parts = normalized_arguments.split()
+
+        if len(parts) != 1:
+            return (
+                (
+                    "El comando solamente admite "
+                    "el identificador de la "
+                    "promocion.\n\n"
+                    "Ejemplo:\n"
+                    "/ver_promocion 1"
+                ),
+                {
+                    "route": route,
+                    "promotion_error": (
+                        "invalid_arguments"
+                    ),
+                },
+            )
+
+        try:
+            promotion_id = int(parts[0])
+
+        except ValueError:
+            return (
+                (
+                    "El identificador de la "
+                    "promocion debe ser un "
+                    "numero entero positivo."
+                ),
+                {
+                    "route": route,
+                    "promotion_error": (
+                        "invalid_promotion_id"
+                    ),
+                },
+            )
+
+        if promotion_id <= 0:
+            return (
+                (
+                    "El identificador de la "
+                    "promocion debe ser un "
+                    "numero entero positivo."
+                ),
+                {
+                    "route": route,
+                    "promotion_error": (
+                        "invalid_promotion_id"
+                    ),
+                    "promotion_id": (
+                        promotion_id
+                    ),
+                },
+            )
+
+        if self._promotion_query_service is None:
+            return (
+                (
+                    "El servicio de consulta de "
+                    "promociones no esta "
+                    "disponible."
+                ),
+                {
+                    "route": route,
+                    "promotion_error": (
+                        "service_unavailable"
+                    ),
+                    "promotion_id": (
+                        promotion_id
+                    ),
+                },
+            )
+
+        try:
+            promotion = (
+                self
+                ._promotion_query_service
+                .get_by_id(promotion_id)
+            )
+
+        except PromotionQueryError as error:
+            return (
+                str(error),
+                {
+                    "route": route,
+                    "promotion_error": (
+                        type(error).__name__
+                    ),
+                    "promotion_id": (
+                        promotion_id
+                    ),
+                },
+            )
+
+        lines = [
+            f"PROMOCION #{promotion.id}",
+            "",
+            (
+                "Ejecucion: "
+                f"#{promotion.execution_id}"
+            ),
+            (
+                "Estado: "
+                f"{promotion.status.value}"
+            ),
+            (
+                "Proyecto destino: "
+                f"{promotion.target_subdirectory}"
+            ),
+            (
+                "Objetivo de pruebas: "
+                f"{promotion.test_target}"
+            ),
+            (
+                "Archivos cambiados: "
+                f"{promotion.changed_file_count}"
+            ),
+            (
+                "Archivos anadidos: "
+                f"{promotion.added_file_count}"
+            ),
+            (
+                "Archivos modificados: "
+                f"{promotion.modified_file_count}"
+            ),
+            (
+                "Hash de vista previa: "
+                f"{promotion.preview_hash}"
+            ),
+            (
+                "Solicitada por: "
+                f"{promotion.requested_by_user_id}"
+            ),
+            (
+                "Fecha de creacion: "
+                f"{promotion.created_at}"
+            ),
+        ]
+
+        if (
+            promotion.confirmed_by_user_id
+            is not None
+        ):
+            lines.append(
+                "Confirmada por: "
+                f"{promotion.confirmed_by_user_id}"
+            )
+
+        if promotion.confirmed_at is not None:
+            lines.append(
+                "Fecha de confirmacion: "
+                f"{promotion.confirmed_at}"
+            )
+
+        if (
+            promotion.promotion_branch
+            is not None
+        ):
+            lines.append(
+                "Rama temporal: "
+                f"{promotion.promotion_branch}"
+            )
+
+        if promotion.base_commit is not None:
+            lines.append(
+                "Commit base: "
+                f"{promotion.base_commit}"
+            )
+
+        if promotion.commit_hash is not None:
+            lines.append(
+                "Commit de promocion: "
+                f"{promotion.commit_hash}"
+            )
+
+        if (
+            promotion.sandbox_exit_code
+            is not None
+        ):
+            lines.append(
+                "Codigo de salida del sandbox: "
+                f"{promotion.sandbox_exit_code}"
+            )
+
+        if (
+            promotion.sandbox_timed_out
+            is not None
+        ):
+            timed_out_text = (
+                "si"
+                if promotion.sandbox_timed_out
+                else "no"
+            )
+
+            lines.append(
+                "Timeout del sandbox: "
+                f"{timed_out_text}"
+            )
+
+        if (
+            promotion
+            .sandbox_duration_seconds
+            is not None
+        ):
+            lines.append(
+                "Tiempo del sandbox: "
+                f"{promotion.sandbox_duration_seconds:.3f} s"
+            )
+
+        if promotion.finished_at is not None:
+            lines.append(
+                "Fecha de finalizacion: "
+                f"{promotion.finished_at}"
+            )
+
+        if promotion.error_message is not None:
+            lines.extend(
+                [
+                    "",
+                    "ERROR REGISTRADO",
+                    promotion.error_message,
+                ]
+            )
+
+        stdout_text = (
+            promotion.sandbox_stdout_text
+            or ""
+        ).strip()
+
+        stderr_text = (
+            promotion.sandbox_stderr_text
+            or ""
+        ).strip()
+
+        maximum_output_characters = 1500
+
+        if stdout_text:
+            if (
+                len(stdout_text)
+                > maximum_output_characters
+            ):
+                stdout_text = (
+                    stdout_text[
+                        :maximum_output_characters
+                    ]
+                    + "\n...[salida truncada]"
+                )
+
+            lines.extend(
+                [
+                    "",
+                    "SALIDA DEL SANDBOX",
+                    stdout_text,
+                ]
+            )
+
+        if stderr_text:
+            if (
+                len(stderr_text)
+                > maximum_output_characters
+            ):
+                stderr_text = (
+                    stderr_text[
+                        :maximum_output_characters
+                    ]
+                    + "\n...[salida truncada]"
+                )
+
+            lines.extend(
+                [
+                    "",
+                    "ERRORES DEL SANDBOX",
+                    stderr_text,
+                ]
+            )
+
+        return (
+            "\n".join(lines),
+            {
+                "route": route,
+                "promotion_id": (
+                    promotion.id
+                ),
+                "execution_id": (
+                    promotion.execution_id
+                ),
+                "promotion_status": (
+                    promotion.status.value
+                ),
+                "target_subdirectory": (
+                    promotion
+                    .target_subdirectory
+                ),
+                "preview_hash": (
+                    promotion.preview_hash
+                ),
+                "promotion_branch": (
+                    promotion.promotion_branch
+                ),
+                "base_commit": (
+                    promotion.base_commit
+                ),
+                "commit_hash": (
+                    promotion.commit_hash
+                ),
+                "sandbox_exit_code": (
+                    promotion.sandbox_exit_code
+                ),
+                "sandbox_timed_out": (
+                    promotion.sandbox_timed_out
+                ),
+                "sandbox_duration_seconds": (
+                    promotion
+                    .sandbox_duration_seconds
+                ),
+                "promotion_error_message": (
+                    promotion.error_message
                 ),
             },
         )

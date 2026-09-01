@@ -38,6 +38,9 @@ from app.execution.promotion_preparation import (
 from app.execution.promotion_target import (
     PromotionTargetResolver,
 )
+from app.execution.promotion_query import (
+    PromotionQueryService,
+)
 
 def test_creates_runtime_without_gateway(
     tmp_path: Path,
@@ -108,6 +111,10 @@ def test_creates_runtime_without_gateway(
             runtime.promotion_target_resolver
             is None
         )
+        assert isinstance(
+            runtime.promotion_query_service,
+            PromotionQueryService,
+        )
 
 
 def test_creates_runtime_with_gateway(
@@ -160,7 +167,10 @@ def test_creates_runtime_with_gateway(
             PromotionTargetResolver,
         )
         assert runtime.sandbox_enabled is True
-
+        assert isinstance(
+            runtime.promotion_query_service,
+            PromotionQueryService,
+        )
 
 @pytest.mark.parametrize(
     (

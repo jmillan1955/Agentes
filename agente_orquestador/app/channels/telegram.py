@@ -126,6 +126,13 @@ class TelegramChannel:
 
         application.add_handler(
             CommandHandler(
+                "ver_promocion",
+                self.handle_view_promotion,
+            )
+        )
+
+        application.add_handler(
+            CommandHandler(
                 "confirmar_promocion",
                 (
                     self
@@ -496,6 +503,16 @@ class TelegramChannel:
         context: (
             ContextTypes.DEFAULT_TYPE
         ),
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_view_promotion(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
     ) -> None:
         await self._process_update(
             update=update,

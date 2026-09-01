@@ -404,6 +404,10 @@ def main() -> None:
                 execution_runtime
                 .promotion_preparation_service
             ),
+            promotion_query_service=(
+                execution_runtime
+                .promotion_query_service
+            ),
             promotion_finalization_service=(
                 execution_runtime
                 .promotion_finalization_service
