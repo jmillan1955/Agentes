@@ -310,6 +310,10 @@ def main() -> None:
                     .openai_verification_reasoning_effort
                 ),
                 web_search_enabled=True,
+                web_search_context_size=(
+                    settings
+                    .openai_web_search_context_size
+                ),
             )
             verification_response_service = (
                 ResponseGenerationService(
