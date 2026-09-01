@@ -188,7 +188,16 @@ class TelegramChannel:
             )
         )
         application.add_handler(
-            CommandHandler("comparar_modelos", self.handle_compare_models)
+            CommandHandler(
+                "verificar",
+                self.handle_verify,
+            )
+        )
+        application.add_handler(
+            CommandHandler(
+                "comparar_modelos",
+                self.handle_compare_models,
+            )
         )
 
         application.add_handler(
@@ -295,6 +304,7 @@ class TelegramChannel:
             "y después una nota de voz\n"
             "/corregir_audio <texto correcto>\n"
             "/simple <pregunta>\n"
+            "/verificar <consulta>\n"
             "/comparar_modelos <pregunta>\n"
             "/confirmar_audio"
         )
@@ -400,9 +410,25 @@ class TelegramChannel:
                 "la petición."
             )
 
-    async def handle_compare_models(self, update: Update,
-                                    context: ContextTypes.DEFAULT_TYPE) -> None:
-        await self._process_update(update=update, content_type=ContentType.COMMAND)
+    async def handle_verify(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
+
+    async def handle_compare_models(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        await self._process_update(
+            update=update,
+            content_type=ContentType.COMMAND,
+        )
 
     async def handle_view_plan(
         self,

@@ -58,6 +58,13 @@ class Settings:
     openai_timeout_seconds: float
     openai_input_cost_per_million: float
     openai_output_cost_per_million: float
+    verification_enabled: bool
+    verification_mode: str
+    openai_verification_model: str
+    openai_verification_reasoning_effort: str
+    openai_web_search_context_size: str
+    openai_verification_input_cost_per_million: float
+    openai_verification_output_cost_per_million: float
     gemini_api_key: str | None
     gemini_general_model: str
     gemini_timeout_seconds: float
@@ -445,6 +452,62 @@ class Settings:
         openai_output_cost_per_million = number(
             "OPENAI_OUTPUT_COST_PER_MILLION", "10", allow_zero=True
         )
+
+        verification_enabled_value = os.getenv(
+            "VERIFICATION_ENABLED", "false"
+        ).strip().lower()
+        if verification_enabled_value not in {
+            "true", "false"
+        }:
+            raise RuntimeError(
+                "VERIFICATION_ENABLED debe ser "
+                "true o false"
+            )
+        verification_enabled = (
+            verification_enabled_value == "true"
+        )
+        verification_mode = os.getenv(
+            "VERIFICATION_MODE", "automatic"
+        ).strip().lower()
+        if verification_mode not in {
+            "automatic", "on_demand"
+        }:
+            raise RuntimeError(
+                "VERIFICATION_MODE debe ser "
+                "automatic o on_demand"
+            )
+        openai_verification_model = os.getenv(
+            "OPENAI_VERIFICATION_MODEL",
+            "gpt-5-mini",
+        ).strip()
+        openai_verification_reasoning_effort = (
+            reasoning_effort(
+                "OPENAI_VERIFICATION_REASONING_EFFORT",
+                "low",
+            )
+        )
+        openai_web_search_context_size = os.getenv(
+            "OPENAI_WEB_SEARCH_CONTEXT_SIZE",
+            "low",
+        ).strip().lower()
+        if openai_web_search_context_size not in {
+            "low", "medium", "high"
+        }:
+            raise RuntimeError(
+                "OPENAI_WEB_SEARCH_CONTEXT_SIZE "
+                "debe ser low, medium o high"
+            )
+        openai_verification_input_cost_per_million = number(
+            "OPENAI_VERIFICATION_INPUT_COST_PER_MILLION",
+            "0.25",
+            allow_zero=True,
+        )
+        openai_verification_output_cost_per_million = number(
+            "OPENAI_VERIFICATION_OUTPUT_COST_PER_MILLION",
+            "2",
+            allow_zero=True,
+        )
+
         gemini_general_model = os.getenv(
             "GEMINI_GENERAL_MODEL", "gemini-2.5-flash-lite"
         ).strip()
@@ -596,6 +659,21 @@ class Settings:
             openai_timeout_seconds=openai_timeout_seconds,
             openai_input_cost_per_million=openai_input_cost_per_million,
             openai_output_cost_per_million=openai_output_cost_per_million,
+            verification_enabled=verification_enabled,
+            verification_mode=verification_mode,
+            openai_verification_model=openai_verification_model,
+            openai_verification_reasoning_effort=(
+                openai_verification_reasoning_effort
+            ),
+            openai_web_search_context_size=(
+                openai_web_search_context_size
+            ),
+            openai_verification_input_cost_per_million=(
+                openai_verification_input_cost_per_million
+            ),
+            openai_verification_output_cost_per_million=(
+                openai_verification_output_cost_per_million
+            ),
             gemini_api_key=gemini_api_key,
             gemini_general_model=gemini_general_model,
             gemini_timeout_seconds=gemini_timeout_seconds,

@@ -54,6 +54,7 @@ from app.providers import (
 from app.response_generation_service import (
     ResponseGenerationService,
 )
+from app.verification import VerificationPolicy
 from app.routing import (
     ProvisionalTaskHandler,
     RequestClassifier,
@@ -105,6 +106,8 @@ class Orchestrator:
             ResponseGenerationService
         ),
         provider_comparison_service: ProviderComparisonService | None = None,
+        verification_response_service: ResponseGenerationService | None = None,
+        verification_policy: VerificationPolicy | None = None,
         task_plan_repository: (
             TaskPlanRepository | None
         ) = None,
@@ -172,6 +175,8 @@ class Orchestrator:
             response_generation_service
         )
         self._provider_comparison_service = provider_comparison_service
+        self._verification_response_service = verification_response_service
+        self._verification_policy = verification_policy
         self._task_plan_repository = task_plan_repository
         self._request_classifier = (
             request_classifier
@@ -374,6 +379,19 @@ class Orchestrator:
                 )
 
             else:
+                verify_with_web = (
+                    self._verification_response_service
+                    is not None
+                    and self._verification_policy
+                    is not None
+                    and self._verification_policy
+                    .requires_web(message.text or "")
+                )
+                selected_service = (
+                    self._verification_response_service
+                    if verify_with_web
+                    else self._response_generation_service
+                )
                 (
                     response_text,
                     language_metadata,
@@ -383,6 +401,12 @@ class Orchestrator:
                         decision is not None
                         and decision.kind
                         == RequestKind.PROJECT_QUERY
+                    ),
+                    response_generation_service=(
+                        selected_service
+                    ),
+                    verified_with_web=(
+                        verify_with_web
                     ),
                 )
 
@@ -455,14 +479,21 @@ class Orchestrator:
         self,
         message: IncomingMessage,
         include_context: bool,
+        response_generation_service: (
+            ResponseGenerationService | None
+        ) = None,
+        verified_with_web: bool = False,
     ) -> tuple[
         str,
         dict[str, object],
     ]:
         try:
+            service = (
+                response_generation_service
+                or self._response_generation_service
+            )
             answer = (
-                self._response_generation_service
-                .generate(
+                service.generate(
                     project_id=self._project_id,
                     query=message.text or "",
                     current_message_id=(
@@ -472,14 +503,23 @@ class Orchestrator:
                         include_context
                     ),
                     response_style=(
-                        message.metadata.get(
+                        "verified"
+                        if verified_with_web
+                        else message.metadata.get(
                             "response_style"
                         )
                     ),
                 )            )
 
             metadata = {
-                "route": "language_provider",
+                "route": (
+                    "web_verification"
+                    if verified_with_web
+                    else "language_provider"
+                ),
+                "verified_with_web": (
+                    verified_with_web
+                ),
                 "model": answer.model,
                 "provider": answer.provider,
                 "input_tokens": answer.input_tokens,
@@ -532,6 +572,84 @@ class Orchestrator:
             }
 
             return response_text, metadata
+
+    def _process_verify_command(
+        self,
+        arguments: str,
+        message_id: str,
+    ) -> tuple[str, dict[str, object]]:
+        if not arguments:
+            return (
+                (
+                    "Debes indicar una consulta.\n\n"
+                    "Ejemplo:\n"
+                    "/verificar versión actual "
+                    "de Home Assistant"
+                ),
+                {
+                    "route": "web_verification",
+                    "verification_error": (
+                        "missing_query"
+                    ),
+                },
+            )
+        if self._verification_response_service is None:
+            return (
+                "La verificación web no está configurada.",
+                {
+                    "route": "web_verification",
+                    "verification_error": (
+                        "service_unavailable"
+                    ),
+                },
+            )
+        try:
+            answer = (
+                self._verification_response_service
+                .generate(
+                    project_id=self._project_id,
+                    query=arguments,
+                    current_message_id=message_id,
+                    include_context=False,
+                    response_style="verified",
+                )
+            )
+            return (
+                answer.text,
+                {
+                    "route": "web_verification",
+                    "verified_with_web": True,
+                    "model": answer.model,
+                    "provider": answer.provider,
+                    "input_tokens": (
+                        answer.input_tokens
+                    ),
+                    "output_tokens": (
+                        answer.output_tokens
+                    ),
+                    "estimated_cost_usd": (
+                        answer.estimated_cost_usd
+                    ),
+                    "elapsed_seconds": (
+                        answer.elapsed_seconds
+                    ),
+                },
+            )
+        except LanguageProviderError as error:
+            return (
+                (
+                    "No se ha podido verificar "
+                    "la consulta.\n\n"
+                    f"{error}"
+                ),
+                {
+                    "route": "web_verification",
+                    "verification_error": (
+                        type(error).__name__
+                    ),
+                    "error_message": str(error),
+                },
+            )
 
     def _process_command(
         self,
@@ -690,6 +808,12 @@ class Orchestrator:
                 {},
             )
 
+        if command == "/verificar":
+            return self._process_verify_command(
+                arguments=arguments,
+                message_id=message_id,
+            )
+
         if command == "/comparar_modelos":
             if not arguments:
                 return ("Debes indicar una pregunta.", {"route": "provider_comparison"})
@@ -763,6 +887,7 @@ class Orchestrator:
                 "/cancelar_ejecucion "
                 "<tarea_id>\n"
                 "/simple <pregunta>"
+                "\n/verificar <consulta>"
                 "\n/comparar_modelos <pregunta>"
             ),
             {},
