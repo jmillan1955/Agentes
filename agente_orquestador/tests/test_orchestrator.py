@@ -41,6 +41,7 @@ from app.response_generation_service import (
     GeneratedAnswer,
 )
 from app.tasks import TaskStatus
+from app.verification import VerificationPolicy
 from app.execution.service import (
     ExecutionPreparationError,
 )
@@ -126,6 +127,8 @@ def create_orchestrator(
         ContextQueryService | None
     ) = None,
     response_generation_service=None,
+    verification_response_service=None,
+    verification_policy=None,
     task_plan_repository=None,
     execution_preparation_service=None,
     execution_query_service=None,
@@ -196,6 +199,12 @@ def create_orchestrator(
         context_builder=context_builder,
         response_generation_service=(
             response_generation_service
+        ),
+        verification_response_service=(
+            verification_response_service
+        ),
+        verification_policy=(
+            verification_policy
         ),
         task_plan_repository=(
             task_plan_repository
@@ -292,6 +301,43 @@ def test_processes_text_message() -> None:
                 "elapsed_seconds"
             ]
             == 1.5
+        )
+
+
+
+def test_project_query_is_not_sent_to_web_verification() -> None:
+    with ContextDatabase(":memory:") as database:
+        orchestrator = create_orchestrator(
+            database,
+            verification_response_service=(
+                UnexpectedResponseGenerationService()
+            ),
+            verification_policy=(
+                VerificationPolicy("automatic")
+            ),
+        )
+
+        incoming = IncomingMessage(
+            channel=ChannelName.TELEGRAM,
+            user_id="123456",
+            conversation_id="chat-123456",
+            content_type=ContentType.TEXT,
+            text=(
+                "¿Qué versión utiliza el proyecto "
+                "calculadora_tkinter?"
+            ),
+        )
+
+        outgoing = orchestrator.process(incoming)
+
+        assert outgoing.metadata[
+            "routing_kind"
+        ] == "project_query"
+        assert outgoing.metadata[
+            "verified_with_web"
+        ] is False
+        assert "calculadora_tkinter" in (
+            outgoing.text or ""
         )
 
 def test_persists_input_and_output() -> None:
