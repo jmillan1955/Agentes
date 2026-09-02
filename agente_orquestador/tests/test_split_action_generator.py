@@ -16,7 +16,10 @@ from app.execution.split_action_generator import (
 )
 from types import SimpleNamespace
 from app.planning import PlanStatus
-from app.providers.base import LanguageResponse
+from app.providers.base import (
+    LanguageProviderError,
+    LanguageResponse,
+)
 
 def create_generator(
 ) -> SplitExecutionActionGenerator:
@@ -548,3 +551,104 @@ def test_does_not_persist_invalid_files(
 
     assert provider.generate.call_count == 4
     manifest_service.create.assert_not_called()
+
+def test_resumes_after_provider_timeout() -> None:
+    provider = Mock()
+    provider.generate.side_effect = (
+        LanguageResponse(
+            text=json.dumps(
+                {
+                    "files": [
+                        {
+                            "relative_path": "suma.py",
+                            "purpose": "Implementar suma",
+                        },
+                        {
+                            "relative_path": (
+                                "tests/test_suma.py"
+                            ),
+                            "purpose": "Probar suma",
+                        },
+                    ],
+                    "pytest_target": ".",
+                }
+            ),
+            model="modelo-de-prueba",
+            elapsed_seconds=0.1,
+        ),
+        LanguageResponse(
+            text=json.dumps(
+                {
+                    "content": (
+                        "def sumar(a, b):\n"
+                        "    return a + b\n"
+                    )
+                }
+            ),
+            model="modelo-de-prueba",
+            elapsed_seconds=0.2,
+        ),
+        LanguageProviderError("timeout"),
+        LanguageResponse(
+            text=json.dumps(
+                {
+                    "content": (
+                        "from suma import sumar\n\n"
+                        "def test_sumar():\n"
+                        "    assert sumar(2, 3) == 5\n"
+                    )
+                }
+            ),
+            model="modelo-de-prueba",
+            elapsed_seconds=0.3,
+        ),
+    )
+
+    manifest_service = Mock()
+    manifest_service.create.return_value = object()
+
+    generator = SplitExecutionActionGenerator(
+        language_provider=provider,
+        manifest_service=manifest_service,
+        limits=ExecutionLimits(),
+    )
+
+    with pytest.raises(
+        ExecutionActionGenerationError,
+        match="tests/test_suma.py",
+    ):
+        generator.generate(
+            execution_id=9,
+            plan=create_plan(),
+        )
+
+    result = generator.generate(
+        execution_id=9,
+        plan=create_plan(),
+    )
+
+    assert provider.generate.call_count == 4
+    assert result.elapsed_seconds == (
+        pytest.approx(0.6)
+    )
+    assert manifest_service.create.call_count == 1
+
+
+def test_limits_previous_file_context() -> None:
+    generator = create_generator()
+
+    compact = generator._compact_generated_files(
+        {
+            "primero.py": "a" * 5000,
+            "segundo.py": "b" * 5000,
+        },
+        max_characters=6000,
+    )
+
+    assert sum(
+        len(item["content_excerpt"])
+        for item in compact
+    ) == 6000
+    assert compact[-1]["relative_path"] == (
+        "segundo.py"
+    )

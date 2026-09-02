@@ -251,7 +251,7 @@ def main() -> None:
                 ),
                 timeout_seconds=(
                     settings
-                    .ollama_timeout_seconds
+                    .ollama_coding_timeout_seconds
                 ),
             )
         )

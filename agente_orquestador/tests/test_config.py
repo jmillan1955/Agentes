@@ -36,6 +36,10 @@ def configure_required_environment(
         "300",
     )
     monkeypatch.setenv(
+        "OLLAMA_CODING_TIMEOUT_SECONDS",
+        "900",
+    )
+    monkeypatch.setenv(
         "SANDBOX_GATEWAY_URL",
         "",
     )
@@ -70,6 +74,10 @@ def test_loads_ollama_configuration(
     assert (
         settings.ollama_timeout_seconds
         == 300.0
+    )
+    assert (
+        settings.ollama_coding_timeout_seconds
+        == 900.0
     )
 
 def test_rejects_empty_ollama_url(
@@ -639,5 +647,23 @@ def test_rejects_empty_promotion_root(
     with pytest.raises(
         RuntimeError,
         match="PROMOTION_REPOSITORY_ROOT",
+    ):
+        Settings.load()
+
+def test_rejects_invalid_coding_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(monkeypatch)
+    monkeypatch.setenv(
+        "OLLAMA_CODING_TIMEOUT_SECONDS",
+        "mucho",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "OLLAMA_CODING_TIMEOUT_SECONDS "
+            "debe ser un numero"
+        ),
     ):
         Settings.load()

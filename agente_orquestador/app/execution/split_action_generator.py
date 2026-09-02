@@ -12,9 +12,16 @@ from app.execution.action_generator import (
     ExecutionActionGenerator,
 )
 import json
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, field
 
 from app.planning import TaskPlan
+from app.providers.base import (
+    LanguageProviderError,
+)
+
+
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class GeneratedFileSpec:
@@ -26,6 +33,17 @@ class GeneratedFileSpec:
 class GeneratedFilePlan:
     files: tuple[GeneratedFileSpec, ...]
     pytest_target: str
+
+
+@dataclass(slots=True)
+class _GenerationCheckpoint:
+    plan_id: int
+    file_plan: GeneratedFilePlan
+    generated_files: dict[str, str] = field(
+        default_factory=dict
+    )
+    model: str = "unknown"
+    elapsed_seconds: float = 0.0
 
 
 class SplitExecutionActionGenerator(
@@ -128,6 +146,95 @@ class SplitExecutionActionGenerator(
             "la raiz del workspace."
         )
 
+    @staticmethod
+    def _compact_plan_context(
+        plan: TaskPlan,
+        max_characters: int = 7000,
+    ) -> dict[str, object]:
+        context: dict[str, object] = {
+            "objective": plan.objective,
+            "interfaces": plan.interfaces,
+            "business_rules": (
+                plan.business_rules
+            ),
+            "tests": plan.tests,
+            "completion_criteria": (
+                plan.completion_criteria
+            ),
+        }
+
+        while (
+            len(
+                json.dumps(
+                    context,
+                    ensure_ascii=False,
+                )
+            )
+            > max_characters
+        ):
+            shortened = False
+
+            for key in (
+                "tests",
+                "business_rules",
+                "completion_criteria",
+                "interfaces",
+            ):
+                values = context[key]
+
+                if (
+                    isinstance(values, tuple)
+                    and len(values) > 1
+                ):
+                    context[key] = values[:-1]
+                    shortened = True
+                    break
+
+            if not shortened:
+                objective = str(
+                    context["objective"]
+                )
+                context["objective"] = (
+                    objective[:max_characters]
+                )
+                break
+
+        return context
+
+    @staticmethod
+    def _compact_generated_files(
+        generated_files: dict[str, str],
+        max_characters: int = 6500,
+    ) -> list[dict[str, str]]:
+        python_files = [
+            (path, content)
+            for path, content
+            in generated_files.items()
+            if (
+                path.lower().endswith(".py")
+                and not SplitExecutionActionGenerator
+                ._is_test_path(path)
+            )
+        ]
+
+        if not python_files:
+            return []
+
+        characters_per_file = max(
+            1,
+            max_characters // len(python_files),
+        )
+
+        return [
+            {
+                "relative_path": path,
+                "content_excerpt": content[
+                    :characters_per_file
+                ],
+            }
+            for path, content in python_files
+        ]
+
     def _build_file_content_prompt(
         self,
         plan: TaskPlan,
@@ -136,8 +243,8 @@ class SplitExecutionActionGenerator(
         generated_files: dict[str, str],
     ) -> str:
         context = {
-            "approved_plan": json.loads(
-                self._serialize_plan(plan)
+            "approved_plan": (
+                self._compact_plan_context(plan)
             ),
             "planned_files": [
                 {
@@ -154,14 +261,11 @@ class SplitExecutionActionGenerator(
                 ),
                 "purpose": file_spec.purpose,
             },
-            "already_generated_files": [
-                {
-                    "relative_path": path,
-                    "content": content,
-                }
-                for path, content
-                in generated_files.items()
-            ],
+            "previous_file_excerpts": (
+                self._compact_generated_files(
+                    generated_files
+                )
+            ),
             "pytest_target": (
                 file_plan.pytest_target
             ),
@@ -173,7 +277,7 @@ class SplitExecutionActionGenerator(
             + json.dumps(
                 context,
                 ensure_ascii=False,
-                indent=2,
+                separators=(",", ":"),
             )
         )
 
@@ -190,13 +294,47 @@ class SplitExecutionActionGenerator(
 
         self._validate_plan(plan)
 
-        (
-            file_plan,
-            model,
-            elapsed_seconds,
-        ) = self._request_file_plan(plan)
+        checkpoints = getattr(
+            self,
+            "_generation_checkpoints",
+            None,
+        )
+        if checkpoints is None:
+            checkpoints = {}
+            self._generation_checkpoints = (
+                checkpoints
+            )
 
-        generated_files: dict[str, str] = {}
+        checkpoint = checkpoints.get(
+            execution_id
+        )
+
+        if (
+            checkpoint is None
+            or checkpoint.plan_id != plan.id
+        ):
+            (
+                file_plan,
+                model,
+                elapsed_seconds,
+            ) = self._request_file_plan(plan)
+
+            checkpoint = _GenerationCheckpoint(
+                plan_id=plan.id,
+                file_plan=file_plan,
+                model=model,
+                elapsed_seconds=elapsed_seconds,
+            )
+            checkpoints[execution_id] = checkpoint
+        else:
+            file_plan = checkpoint.file_plan
+            logger.info(
+                "Reanudando manifiesto de la "
+                "ejecucion %s con %s archivos "
+                "ya generados",
+                execution_id,
+                len(checkpoint.generated_files),
+            )
 
         ordered_files = tuple(
             sorted(
@@ -210,30 +348,77 @@ class SplitExecutionActionGenerator(
             )
         )
 
-        for file_spec in ordered_files:
-            (
-                content,
-                response_model,
-                response_elapsed,
-            ) = self._request_file_content(
-                plan=plan,
-                file_plan=file_plan,
-                file_spec=file_spec,
-                generated_files=(
-                    generated_files
-                ),
+        for index, file_spec in enumerate(
+            ordered_files,
+            start=1,
+        ):
+            if (
+                file_spec.relative_path
+                in checkpoint.generated_files
+            ):
+                logger.info(
+                    "Reutilizando archivo %s/%s: %s",
+                    index,
+                    len(ordered_files),
+                    file_spec.relative_path,
+                )
+                continue
+
+            logger.info(
+                "Generando archivo %s/%s: %s",
+                index,
+                len(ordered_files),
+                file_spec.relative_path,
             )
 
-            generated_files[
+            try:
+                (
+                    content,
+                    response_model,
+                    response_elapsed,
+                ) = self._request_file_content(
+                    plan=plan,
+                    file_plan=file_plan,
+                    file_spec=file_spec,
+                    generated_files=(
+                        checkpoint.generated_files
+                    ),
+                )
+            except (
+                LanguageProviderError,
+                ExecutionActionGenerationError,
+            ) as error:
+                logger.exception(
+                    "Fallo al generar el archivo %s",
+                    file_spec.relative_path,
+                )
+                raise ExecutionActionGenerationError(
+                    "No se pudo generar el archivo "
+                    f"'{file_spec.relative_path}': "
+                    f"{error}"
+                ) from error
+
+            checkpoint.generated_files[
                 file_spec.relative_path
             ] = content
-            model = response_model
-            elapsed_seconds += response_elapsed
+            checkpoint.model = response_model
+            checkpoint.elapsed_seconds += (
+                response_elapsed
+            )
+
+            logger.info(
+                "Archivo generado %s/%s: %s",
+                index,
+                len(ordered_files),
+                file_spec.relative_path,
+            )
 
         actions = self._build_actions(
             file_plan=file_plan,
             ordered_files=ordered_files,
-            generated_files=generated_files,
+            generated_files=(
+                checkpoint.generated_files
+            ),
         )
 
         self._validate_unique_write_paths(
@@ -248,13 +433,17 @@ class SplitExecutionActionGenerator(
             actions=actions,
         )
 
+        checkpoints.pop(execution_id, None)
+
         return ExecutionActionGenerationResult(
             manifest=manifest,
             actions=actions,
-            model=model,
-            elapsed_seconds=elapsed_seconds,
+            model=checkpoint.model,
+            elapsed_seconds=(
+                checkpoint.elapsed_seconds
+            ),
         )
-    
+
     def _parse_file_plan(
         self,
         response_text: str,
