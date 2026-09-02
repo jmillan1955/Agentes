@@ -64,16 +64,31 @@ def test_openai_web_search_is_required_and_sources_are_shown(
 ) -> None:
     request = {}
 
+    citation_text = (
+        " ([Documentación oficial]"
+        "(https://example.com/documentacion"
+        "?utm_source=openai))"
+    )
+    output_text = (
+        "Respuesta verificada"
+        + citation_text
+    )
+
     class Citation:
         type = "url_citation"
-        url = "https://example.com/documentacion"
+        url = (
+            "https://example.com/documentacion"
+            "?utm_source=openai"
+        )
         title = "Documentación oficial"
+        start_index = len("Respuesta verificada")
+        end_index = len(output_text)
 
     class FakeResponses:
         def create(self, **kwargs):
             request.update(kwargs)
             return SimpleNamespace(
-                output_text="Respuesta verificada",
+                output_text=output_text,
                 output=[
                     SimpleNamespace(
                         content=[
@@ -116,3 +131,8 @@ def test_openai_web_search_is_required_and_sources_are_shown(
         "effort": "low"
     }
     assert "https://example.com/documentacion" in result.text
+    assert "utm_source" not in result.text
+    assert citation_text not in result.text
+    assert result.text.count(
+        "https://example.com/documentacion"
+    ) == 1
