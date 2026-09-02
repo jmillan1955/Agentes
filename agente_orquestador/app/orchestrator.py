@@ -380,7 +380,10 @@ class Orchestrator:
 
             else:
                 verify_with_web = (
-                    self._verification_response_service
+                    decision is not None
+                    and decision.kind
+                    == RequestKind.GENERAL_QUERY
+                    and self._verification_response_service
                     is not None
                     and self._verification_policy
                     is not None
