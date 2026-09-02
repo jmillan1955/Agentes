@@ -77,7 +77,16 @@ class RequestClassifier:
             normalized_text=normalized_text,
         )
 
-        if first_word in self._TASK_VERBS:
+        project_task_verb = (
+            self._project_task_verb(
+                normalized_text
+            )
+        )
+
+        if (
+            first_word in self._TASK_VERBS
+            or project_task_verb is not None
+        ):
             return RoutingDecision(
                 kind=RequestKind.TASK,
                 summary=clean_text,
@@ -97,6 +106,28 @@ class RequestClassifier:
             kind=RequestKind.GENERAL_QUERY,
             summary=clean_text,
             confidence=0.70,
+        )
+
+    def _project_task_verb(
+        self,
+        normalized_text: str,
+    ) -> str | None:
+        verbs = "|".join(
+            sorted(self._TASK_VERBS)
+        )
+        match = re.search(
+            (
+                r"\bproyecto\s+"
+                r"[a-z0-9_-]+"
+                r"(?:\s*[,;:]\s*|\s+)"
+                rf"({verbs})\b"
+            ),
+            normalized_text,
+        )
+        return (
+            match.group(1)
+            if match is not None
+            else None
         )
 
     @staticmethod
