@@ -148,7 +148,7 @@ def test_requires_key_for_openai_coding_provider(
 ) -> None:
     configure_required_environment(monkeypatch)
     monkeypatch.setenv("CODING_PROVIDER", "openai")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "")
 
     with pytest.raises(
         RuntimeError,
