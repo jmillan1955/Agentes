@@ -13,6 +13,7 @@ from app.execution.action_generator import (
 )
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 
 from app.planning import TaskPlan
@@ -105,7 +106,9 @@ class SplitExecutionActionGenerator(
                 "business_rules": (
                     plan.business_rules
                 ),
+                "phases": plan.phases,
                 "tests": plan.tests,
+                "deployment": plan.deployment,
                 "excluded_items": (
                     plan.excluded_items
                 ),
@@ -623,6 +626,84 @@ class SplitExecutionActionGenerator(
 
         return content
 
+    @staticmethod
+    def _validate_file_plan_against_plan(
+        plan: TaskPlan,
+        file_plan: GeneratedFilePlan,
+    ) -> None:
+        planned_paths = {
+            file_spec.relative_path.lower()
+            for file_spec in file_plan.files
+        }
+
+        if (
+            plan.tests
+            and not any(
+                SplitExecutionActionGenerator
+                ._is_test_path(path)
+                for path in planned_paths
+            )
+        ):
+            raise ExecutionActionGenerationError(
+                "El plan aprobado exige pruebas, "
+                "pero no se ha incluido ningun "
+                "archivo de tests"
+            )
+
+        pytest_target = (
+            file_plan.pytest_target.lower()
+        )
+        if (
+            pytest_target.endswith(".py")
+            or pytest_target in planned_paths
+        ):
+            raise ExecutionActionGenerationError(
+                "pytest_target debe apuntar a un "
+                "directorio, no a un archivo"
+            )
+
+        plan_texts = (
+            plan.objective,
+            *plan.scope,
+            *plan.interfaces,
+            *plan.phases,
+            *plan.tests,
+            *plan.deployment,
+            *plan.completion_criteria,
+        )
+        explicit_paths: set[str] = set()
+
+        for text in plan_texts:
+            explicit_paths.update(
+                match.lower()
+                for match in re.findall(
+                    (
+                        r"\b(?:[A-Za-z0-9_-]+/)*"
+                        r"[A-Za-z0-9_-]+"
+                        r"\.(?:py|md)\b"
+                    ),
+                    text,
+                    flags=re.IGNORECASE,
+                )
+            )
+
+        if any(
+            "readme" in text.lower()
+            for text in plan_texts
+        ):
+            explicit_paths.add("readme.md")
+
+        missing_paths = sorted(
+            explicit_paths - planned_paths
+        )
+
+        if missing_paths:
+            raise ExecutionActionGenerationError(
+                "Faltan archivos exigidos por el "
+                "plan aprobado: "
+                + ", ".join(missing_paths)
+            )
+
     def _request_file_plan(
         self,
         plan: TaskPlan,
@@ -657,6 +738,10 @@ class SplitExecutionActionGenerator(
             try:
                 file_plan = self._parse_file_plan(
                     response.text
+                )
+                self._validate_file_plan_against_plan(
+                    plan=plan,
+                    file_plan=file_plan,
                 )
             except (
                 ExecutionActionGenerationError
