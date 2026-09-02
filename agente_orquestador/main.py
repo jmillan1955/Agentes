@@ -77,28 +77,65 @@ logging.getLogger("httpcore").setLevel(
 
 
 def create_language_provider(
-    settings: Settings, provider_name: str, *, planning: bool = False
+    settings: Settings,
+    provider_name: str,
+    *,
+    planning: bool = False,
+    coding: bool = False,
 ) -> LanguageProvider:
+    if planning and coding:
+        raise ValueError(
+            "Un proveedor no puede ser de planificacion y codigo a la vez"
+        )
     if provider_name == "ollama":
         return OllamaProvider(
             base_url=settings.ollama_base_url,
-            model=(settings.ollama_coding_model if planning
+            model=(settings.ollama_coding_model if planning or coding
                    else settings.ollama_general_model),
-            timeout_seconds=settings.ollama_timeout_seconds,
+            timeout_seconds=(
+                settings.ollama_coding_timeout_seconds
+                if coding
+                else settings.ollama_timeout_seconds
+            ),
         )
     if provider_name == "openai":
         if settings.openai_api_key is None:
             raise RuntimeError("Falta OPENAI_API_KEY")
         return OpenAIProvider(
             api_key=settings.openai_api_key,
-            model=(settings.openai_planning_model if planning
-                   else settings.openai_general_model),
-            timeout_seconds=settings.openai_timeout_seconds,
-            input_cost_per_million=settings.openai_input_cost_per_million,
-            output_cost_per_million=settings.openai_output_cost_per_million,
-            reasoning_effort=(settings.openai_planning_reasoning_effort
-                              if planning else
-                              settings.openai_general_reasoning_effort),
+            model=(
+                settings.openai_coding_model
+                if coding
+                else (
+                    settings.openai_planning_model
+                    if planning
+                    else settings.openai_general_model
+                )
+            ),
+            timeout_seconds=(
+                settings.openai_coding_timeout_seconds
+                if coding
+                else settings.openai_timeout_seconds
+            ),
+            input_cost_per_million=(
+                settings.openai_coding_input_cost_per_million
+                if coding
+                else settings.openai_input_cost_per_million
+            ),
+            output_cost_per_million=(
+                settings.openai_coding_output_cost_per_million
+                if coding
+                else settings.openai_output_cost_per_million
+            ),
+            reasoning_effort=(
+                settings.openai_coding_reasoning_effort
+                if coding
+                else (
+                    settings.openai_planning_reasoning_effort
+                    if planning
+                    else settings.openai_general_reasoning_effort
+                )
+            ),
         )
     if provider_name == "gemini":
         if settings.gemini_api_key is None:
@@ -241,19 +278,10 @@ def main() -> None:
             settings, settings.general_provider
         )
 
-        coding_language_provider = (
-            OllamaProvider(
-                base_url=(
-                    settings.ollama_base_url
-                ),
-                model=(
-                    settings.ollama_coding_model
-                ),
-                timeout_seconds=(
-                    settings
-                    .ollama_coding_timeout_seconds
-                ),
-            )
+        coding_language_provider = create_language_provider(
+            settings,
+            settings.coding_provider,
+            coding=True,
         )
 
         logger.info(
@@ -264,6 +292,11 @@ def main() -> None:
         logger.info(
             "Proveedor para planificacion: %s",
             settings.planning_provider,
+        )
+
+        logger.info(
+            "Proveedor para generacion de codigo: %s",
+            settings.coding_provider,
         )
 
         planning_language_provider = create_language_provider(
