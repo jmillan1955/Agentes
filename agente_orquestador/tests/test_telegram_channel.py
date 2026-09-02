@@ -540,3 +540,24 @@ def test_view_promotion_handler_delegates_command(
             ),
         )
     )
+
+
+def test_formats_complete_metrics_without_model() -> None:
+    outgoing = OutgoingMessage(
+        channel=ChannelName.TELEGRAM,
+        conversation_id="654321",
+        content_type=ContentType.TEXT,
+        correlation_id="mensaje-interno",
+        text="TAREA REGISTRADA",
+        metadata={},
+    )
+
+    text = TelegramChannel.format_outgoing_text(
+        outgoing
+    )
+
+    assert "⏱️ Tiempo de ejecución: 0,00 minutos" in text
+    assert "🤖 Modelo: No aplica" in text
+    assert "🔌 Proveedor: interno" in text
+    assert "🔢 Tokens: 0 entrada + 0 salida" in text
+    assert "💵 Coste estimado: $0.000000" in text
