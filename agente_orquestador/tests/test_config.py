@@ -40,6 +40,10 @@ def configure_required_environment(
         "900",
     )
     monkeypatch.setenv(
+        "CODING_PROVIDER",
+        "ollama",
+    )
+    monkeypatch.setenv(
         "SANDBOX_GATEWAY_URL",
         "",
     )
