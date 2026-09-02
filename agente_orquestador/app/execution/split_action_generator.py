@@ -671,9 +671,14 @@ class SplitExecutionActionGenerator(
         for required_path in sorted(
             required_paths - known_paths
         ):
+            output_path = (
+                "README.md"
+                if required_path == "readme.md"
+                else required_path
+            )
             files.append(
                 GeneratedFileSpec(
-                    relative_path=required_path,
+                    relative_path=output_path,
                     purpose=(
                         "Crear el archivo exigido "
                         "por el plan aprobado"
