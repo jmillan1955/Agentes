@@ -627,6 +627,128 @@ class SplitExecutionActionGenerator(
         return content
 
     @staticmethod
+    def _complete_file_plan_from_plan(
+        plan: TaskPlan,
+        file_plan: GeneratedFilePlan,
+    ) -> GeneratedFilePlan:
+        plan_texts = (
+            plan.objective,
+            *plan.scope,
+            *plan.interfaces,
+            *plan.phases,
+            *plan.tests,
+            *plan.deployment,
+            *plan.completion_criteria,
+        )
+        required_paths: set[str] = set()
+
+        for text in plan_texts:
+            required_paths.update(
+                match.lower()
+                for match in re.findall(
+                    (
+                        r"\b(?:[A-Za-z0-9_-]+/)*"
+                        r"[A-Za-z0-9_-]+"
+                        r"\.(?:py|md)\b"
+                    ),
+                    text,
+                    flags=re.IGNORECASE,
+                )
+            )
+
+        if any(
+            "readme" in text.lower()
+            for text in plan_texts
+        ):
+            required_paths.add("readme.md")
+
+        files = list(file_plan.files)
+        known_paths = {
+            item.relative_path.lower()
+            for item in files
+        }
+
+        for required_path in sorted(
+            required_paths - known_paths
+        ):
+            output_path = (
+                "README.md"
+                if required_path == "readme.md"
+                else required_path
+            )
+            files.append(
+                GeneratedFileSpec(
+                    relative_path=output_path,
+                    purpose=(
+                        "Crear el archivo exigido "
+                        "por el plan aprobado"
+                    ),
+                )
+            )
+            known_paths.add(required_path)
+
+        if (
+            plan.tests
+            and not any(
+                SplitExecutionActionGenerator
+                ._is_test_path(path)
+                for path in known_paths
+            )
+        ):
+            source_candidates = [
+                PurePosixPath(path).stem
+                for path in sorted(known_paths)
+                if (
+                    path.endswith(".py")
+                    and PurePosixPath(path).name
+                    not in {"main.py", "ui.py"}
+                )
+            ]
+            preferred = next(
+                (
+                    name
+                    for name in source_candidates
+                    if (
+                        "engine" in name
+                        or "logic" in name
+                    )
+                ),
+                (
+                    source_candidates[0]
+                    if source_candidates
+                    else "generated_project"
+                ),
+            )
+            test_path = (
+                f"tests/test_{preferred}.py"
+            )
+            files.append(
+                GeneratedFileSpec(
+                    relative_path=test_path,
+                    purpose=(
+                        "Probar la logica exigida "
+                        "por el plan aprobado sin "
+                        "abrir ventanas"
+                    ),
+                )
+            )
+            known_paths.add(test_path)
+
+        pytest_target = file_plan.pytest_target
+        normalized_target = pytest_target.lower()
+
+        if (
+            normalized_target.endswith(".py")
+            or normalized_target in known_paths
+        ):
+            pytest_target = "."
+
+        return GeneratedFilePlan(
+            files=tuple(files),
+            pytest_target=pytest_target,
+        )
+
+    @staticmethod
     def _validate_file_plan_against_plan(
         plan: TaskPlan,
         file_plan: GeneratedFilePlan,
@@ -738,6 +860,13 @@ class SplitExecutionActionGenerator(
             try:
                 file_plan = self._parse_file_plan(
                     response.text
+                )
+                file_plan = (
+                    self
+                    ._complete_file_plan_from_plan(
+                        plan=plan,
+                        file_plan=file_plan,
+                    )
                 )
                 self._validate_file_plan_against_plan(
                     plan=plan,

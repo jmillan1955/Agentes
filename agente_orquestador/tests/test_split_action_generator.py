@@ -753,3 +753,61 @@ def test_rejects_missing_explicit_plan_files(
                 file_plan=file_plan,
             )
         )
+
+
+def test_completes_incomplete_file_plan() -> None:
+    plan = create_plan()
+    plan.interfaces = (
+        "Motor en calculator_engine.py",
+        "Arranque en main.py",
+        "Interfaz en ui.py",
+    )
+    plan.phases = (
+        "Documentar el proyecto en README",
+    )
+
+    incomplete = GeneratedFilePlan(
+        files=(
+            GeneratedFileSpec(
+                relative_path="calculator_engine.py",
+                purpose="Implementar el motor",
+            ),
+            GeneratedFileSpec(
+                relative_path="main.py",
+                purpose="Arrancar la aplicacion",
+            ),
+            GeneratedFileSpec(
+                relative_path="ui.py",
+                purpose="Crear la interfaz",
+            ),
+        ),
+        pytest_target="calculator_engine.py",
+    )
+
+    completed = (
+        create_generator()
+        ._complete_file_plan_from_plan(
+            plan=plan,
+            file_plan=incomplete,
+        )
+    )
+
+    assert {
+        item.relative_path
+        for item in completed.files
+    } == {
+        "calculator_engine.py",
+        "main.py",
+        "ui.py",
+        "README.md",
+        "tests/test_calculator_engine.py",
+    }
+    assert completed.pytest_target == "."
+
+    (
+        create_generator()
+        ._validate_file_plan_against_plan(
+            plan=plan,
+            file_plan=completed,
+        )
+    )
