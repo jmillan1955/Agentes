@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import re
 import time
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from openai import OpenAI
 
 from app.providers.base import LanguageProviderError, LanguageResponse
@@ -75,6 +78,10 @@ class OpenAIProvider:
         if not content:
             raise LanguageProviderError("OpenAI ha devuelto una respuesta vacia")
         if self._web_search_enabled:
+            content = self._strip_inline_citations(
+                content,
+                response,
+            )
             sources = self._extract_web_sources(
                 response
             )
@@ -122,7 +129,9 @@ class OpenAIProvider:
                         "url_citation",
                         annotation,
                     )
-                    url = getattr(citation, "url", "")
+                    url = OpenAIProvider._clean_source_url(
+                        getattr(citation, "url", "")
+                    )
                     if not url or url in seen_urls:
                         continue
                     title = (
@@ -132,3 +141,91 @@ class OpenAIProvider:
                     seen_urls.add(url)
                     sources.append((title, url))
         return tuple(sources)
+
+
+    @staticmethod
+    def _strip_inline_citations(
+        text: str,
+        response,
+    ) -> str:
+        ranges: list[tuple[int, int]] = []
+        for item in getattr(response, "output", ()) or ():
+            for content in getattr(item, "content", ()) or ():
+                for annotation in (
+                    getattr(content, "annotations", ())
+                    or ()
+                ):
+                    if getattr(annotation, "type", "") != "url_citation":
+                        continue
+                    citation = getattr(
+                        annotation,
+                        "url_citation",
+                        annotation,
+                    )
+                    start = getattr(
+                        citation,
+                        "start_index",
+                        getattr(
+                            annotation,
+                            "start_index",
+                            None,
+                        ),
+                    )
+                    end = getattr(
+                        citation,
+                        "end_index",
+                        getattr(
+                            annotation,
+                            "end_index",
+                            None,
+                        ),
+                    )
+                    if (
+                        isinstance(start, int)
+                        and isinstance(end, int)
+                        and 0 <= start < end <= len(text)
+                    ):
+                        ranges.append((start, end))
+
+        cleaned = text
+        for start, end in sorted(
+            set(ranges),
+            reverse=True,
+        ):
+            cleaned = (
+                cleaned[:start].rstrip()
+                + cleaned[end:]
+            )
+
+        cleaned = re.sub(
+            r"\s*\(\[[^\]]+\]\(https?://[^)]+\)\)",
+            "",
+            cleaned,
+        )
+        return cleaned.strip()
+
+    @staticmethod
+    def _clean_source_url(url: str) -> str:
+        if not url:
+            return ""
+        parts = urlsplit(url)
+        query = urlencode(
+            [
+                (key, value)
+                for key, value in parse_qsl(
+                    parts.query,
+                    keep_blank_values=True,
+                )
+                if key.lower() != "utm_source"
+            ],
+            doseq=True,
+        )
+        return urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc,
+                parts.path,
+                query,
+                parts.fragment,
+            )
+        )
