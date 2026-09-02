@@ -33,6 +33,10 @@ class GeneratedPlan:
     plan: TaskPlan
     model: str
     elapsed_seconds: float
+    provider: str = "unknown"
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    estimated_cost_usd: float | None = None
 
 
 class PlanningService:
@@ -158,6 +162,17 @@ class PlanningService:
             model=language_response.model,
             elapsed_seconds=(
                 language_response.elapsed_seconds
+            ),
+            provider=language_response.provider,
+            input_tokens=(
+                language_response.input_tokens
+            ),
+            output_tokens=(
+                language_response.output_tokens
+            ),
+            estimated_cost_usd=(
+                language_response
+                .estimated_cost_usd
             ),
         )
 
