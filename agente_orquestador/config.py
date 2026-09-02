@@ -47,6 +47,7 @@ class Settings:
     ollama_general_model: str
     ollama_coding_model: str
     ollama_timeout_seconds: float
+    ollama_coding_timeout_seconds: float
     general_provider: str
     planning_provider: str
     comparison_providers: tuple[str, ...]
@@ -397,6 +398,28 @@ class Settings:
                 "ser mayor que cero"
             )
 
+        coding_timeout_value = os.getenv(
+            "OLLAMA_CODING_TIMEOUT_SECONDS",
+            "900",
+        ).strip()
+
+        try:
+            ollama_coding_timeout_seconds = float(
+                coding_timeout_value
+            )
+
+        except ValueError as error:
+            raise RuntimeError(
+                "OLLAMA_CODING_TIMEOUT_SECONDS "
+                "debe ser un numero"
+            ) from error
+
+        if ollama_coding_timeout_seconds <= 0:
+            raise RuntimeError(
+                "OLLAMA_CODING_TIMEOUT_SECONDS "
+                "debe ser mayor que cero"
+            )
+
         supported_providers = {"ollama", "openai", "gemini"}
         general_provider = os.getenv("GENERAL_PROVIDER", "ollama").strip().lower()
         planning_provider = os.getenv("PLANNING_PROVIDER", "ollama").strip().lower()
@@ -647,6 +670,9 @@ class Settings:
             ),
             ollama_timeout_seconds=(
                 ollama_timeout_seconds
+            ),
+            ollama_coding_timeout_seconds=(
+                ollama_coding_timeout_seconds
             ),
             general_provider=general_provider,
             planning_provider=planning_provider,
