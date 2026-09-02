@@ -50,15 +50,21 @@ class Settings:
     ollama_coding_timeout_seconds: float
     general_provider: str
     planning_provider: str
+    coding_provider: str
     comparison_providers: tuple[str, ...]
     openai_api_key: str | None
     openai_general_model: str
     openai_planning_model: str
+    openai_coding_model: str
     openai_general_reasoning_effort: str
     openai_planning_reasoning_effort: str
+    openai_coding_reasoning_effort: str
     openai_timeout_seconds: float
+    openai_coding_timeout_seconds: float
     openai_input_cost_per_million: float
     openai_output_cost_per_million: float
+    openai_coding_input_cost_per_million: float
+    openai_coding_output_cost_per_million: float
     verification_enabled: bool
     verification_mode: str
     openai_verification_model: str
@@ -423,12 +429,22 @@ class Settings:
         supported_providers = {"ollama", "openai", "gemini"}
         general_provider = os.getenv("GENERAL_PROVIDER", "ollama").strip().lower()
         planning_provider = os.getenv("PLANNING_PROVIDER", "ollama").strip().lower()
+        coding_provider = os.getenv("CODING_PROVIDER", "ollama").strip().lower()
+        if coding_provider not in {"ollama", "openai"}:
+            raise RuntimeError(
+                "CODING_PROVIDER debe ser ollama u openai"
+            )
         comparison_providers = tuple(dict.fromkeys(
             item.strip().lower()
             for item in os.getenv("COMPARISON_PROVIDERS", "ollama").split(",")
             if item.strip()
         ))
-        selected = {general_provider, planning_provider, *comparison_providers}
+        selected = {
+            general_provider,
+            planning_provider,
+            coding_provider,
+            *comparison_providers,
+        }
         unknown = selected - supported_providers
         if unknown:
             raise RuntimeError("Proveedor no soportado: " + ", ".join(sorted(unknown)))
@@ -451,6 +467,13 @@ class Settings:
 
         openai_general_model = os.getenv("OPENAI_GENERAL_MODEL", "gpt-5").strip()
         openai_planning_model = os.getenv("OPENAI_PLANNING_MODEL", "gpt-5").strip()
+        openai_coding_model = os.getenv(
+            "OPENAI_CODING_MODEL", "gpt-5-mini"
+        ).strip()
+        if not openai_coding_model:
+            raise RuntimeError(
+                "OPENAI_CODING_MODEL no puede estar vacio"
+            )
 
         def reasoning_effort(name: str, default: str) -> str:
             value = os.getenv(name, default).strip().lower()
@@ -468,12 +491,24 @@ class Settings:
         openai_planning_reasoning_effort = reasoning_effort(
             "OPENAI_PLANNING_REASONING_EFFORT", "low"
         )
+        openai_coding_reasoning_effort = reasoning_effort(
+            "OPENAI_CODING_REASONING_EFFORT", "low"
+        )
         openai_timeout_seconds = number("OPENAI_TIMEOUT_SECONDS", "120")
+        openai_coding_timeout_seconds = number(
+            "OPENAI_CODING_TIMEOUT_SECONDS", "300"
+        )
         openai_input_cost_per_million = number(
             "OPENAI_INPUT_COST_PER_MILLION", "1.25", allow_zero=True
         )
         openai_output_cost_per_million = number(
             "OPENAI_OUTPUT_COST_PER_MILLION", "10", allow_zero=True
+        )
+        openai_coding_input_cost_per_million = number(
+            "OPENAI_CODING_INPUT_COST_PER_MILLION", "0.25", allow_zero=True
+        )
+        openai_coding_output_cost_per_million = number(
+            "OPENAI_CODING_OUTPUT_COST_PER_MILLION", "2", allow_zero=True
         )
 
         verification_enabled_value = os.getenv(
@@ -676,15 +711,25 @@ class Settings:
             ),
             general_provider=general_provider,
             planning_provider=planning_provider,
+            coding_provider=coding_provider,
             comparison_providers=comparison_providers,
             openai_api_key=openai_api_key,
             openai_general_model=openai_general_model,
             openai_planning_model=openai_planning_model,
+            openai_coding_model=openai_coding_model,
             openai_general_reasoning_effort=openai_general_reasoning_effort,
             openai_planning_reasoning_effort=openai_planning_reasoning_effort,
+            openai_coding_reasoning_effort=openai_coding_reasoning_effort,
             openai_timeout_seconds=openai_timeout_seconds,
+            openai_coding_timeout_seconds=openai_coding_timeout_seconds,
             openai_input_cost_per_million=openai_input_cost_per_million,
             openai_output_cost_per_million=openai_output_cost_per_million,
+            openai_coding_input_cost_per_million=(
+                openai_coding_input_cost_per_million
+            ),
+            openai_coding_output_cost_per_million=(
+                openai_coding_output_cost_per_million
+            ),
             verification_enabled=verification_enabled,
             verification_mode=verification_mode,
             openai_verification_model=openai_verification_model,

@@ -79,6 +79,82 @@ def test_loads_ollama_configuration(
         settings.ollama_coding_timeout_seconds
         == 900.0
     )
+    assert settings.coding_provider == "ollama"
+    assert settings.openai_coding_model == (
+        "gpt-5-mini"
+    )
+    assert (
+        settings.openai_coding_timeout_seconds
+        == 300.0
+    )
+
+
+def test_loads_openai_coding_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(monkeypatch)
+    monkeypatch.setenv("CODING_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "key-de-prueba")
+    monkeypatch.setenv(
+        "OPENAI_CODING_MODEL", "gpt-5-mini"
+    )
+    monkeypatch.setenv(
+        "OPENAI_CODING_REASONING_EFFORT", "low"
+    )
+    monkeypatch.setenv(
+        "OPENAI_CODING_TIMEOUT_SECONDS", "240"
+    )
+    monkeypatch.setenv(
+        "OPENAI_CODING_INPUT_COST_PER_MILLION", "0.25"
+    )
+    monkeypatch.setenv(
+        "OPENAI_CODING_OUTPUT_COST_PER_MILLION", "2"
+    )
+
+    settings = Settings.load()
+
+    assert settings.coding_provider == "openai"
+    assert settings.openai_coding_model == "gpt-5-mini"
+    assert (
+        settings.openai_coding_reasoning_effort
+        == "low"
+    )
+    assert settings.openai_coding_timeout_seconds == 240.0
+    assert (
+        settings.openai_coding_input_cost_per_million
+        == 0.25
+    )
+    assert (
+        settings.openai_coding_output_cost_per_million
+        == 2.0
+    )
+
+
+def test_rejects_unsupported_coding_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(monkeypatch)
+    monkeypatch.setenv("CODING_PROVIDER", "gemini")
+
+    with pytest.raises(
+        RuntimeError,
+        match="CODING_PROVIDER debe ser ollama u openai",
+    ):
+        Settings.load()
+
+
+def test_requires_key_for_openai_coding_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_required_environment(monkeypatch)
+    monkeypatch.setenv("CODING_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Falta OPENAI_API_KEY para usar OpenAI",
+    ):
+        Settings.load()
 
 def test_rejects_empty_ollama_url(
     monkeypatch: pytest.MonkeyPatch,
