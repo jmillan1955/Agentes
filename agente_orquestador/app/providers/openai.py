@@ -43,11 +43,21 @@ class OpenAIProvider:
             raise ValueError("prompt no puede estar vacio")
         if response_format not in (None, "json"):
             raise ValueError("response_format solamente admite json")
+        instructions = system_prompt
+        if response_format == "json":
+            json_instruction = (
+                "Devuelve exclusivamente un objeto JSON valido."
+            )
+            instructions = (
+                f"{system_prompt}\n\n{json_instruction}"
+                if system_prompt
+                else json_instruction
+            )
         started = time.perf_counter()
         try:
             request = {
                 "model": self._model,
-                "instructions": system_prompt,
+                "instructions": instructions,
                 "input": prompt.strip(),
                 "reasoning": {
                     "effort": self._reasoning_effort
