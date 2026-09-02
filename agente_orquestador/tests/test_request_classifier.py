@@ -89,3 +89,18 @@ def test_detects_named_project() -> None:
         decision.project_name
         == "agente_audioText"
     )
+
+
+def test_classifies_task_after_named_project_preamble() -> None:
+    decision = RequestClassifier().classify(
+        (
+            "En el proyecto calculadora_tkinter, "
+            "crea una calculadora visual"
+        )
+    )
+
+    assert decision.kind == RequestKind.TASK
+    assert (
+        decision.project_name
+        == "calculadora_tkinter"
+    )
