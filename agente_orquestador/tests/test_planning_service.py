@@ -109,6 +109,10 @@ class FakeLanguageProvider:
             text=self._text,
             model="modelo-prueba",
             elapsed_seconds=1.25,
+            provider="openai",
+            input_tokens=120,
+            output_tokens=45,
+            estimated_cost_usd=0.00125,
         )
 
 
@@ -226,6 +230,13 @@ def test_generates_and_persists_plan() -> None:
         )
         assert generated.model == "modelo-prueba"
         assert generated.elapsed_seconds == 1.25
+        assert generated.provider == "openai"
+        assert generated.input_tokens == 120
+        assert generated.output_tokens == 45
+        assert (
+            generated.estimated_cost_usd
+            == 0.00125
+        )
         assert (
             "aplicación web adaptada al móvil"
             in (

@@ -3942,6 +3942,21 @@ class Orchestrator:
                     result.generated_plan
                     .elapsed_seconds
                 ),
+                "provider": (
+                    result.generated_plan.provider
+                ),
+                "input_tokens": (
+                    result.generated_plan
+                    .input_tokens
+                ),
+                "output_tokens": (
+                    result.generated_plan
+                    .output_tokens
+                ),
+                "estimated_cost_usd": (
+                    result.generated_plan
+                    .estimated_cost_usd
+                ),
             },
         )
 

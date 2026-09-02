@@ -5,6 +5,7 @@ import logging
 import tempfile
 from dataclasses import replace
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from telegram import Update
@@ -964,6 +965,8 @@ class TelegramChannel:
             incoming.message_id,
         )
 
+        processing_started = perf_counter()
+
         if (
             progress_text is not None
             and update.message is not None
@@ -995,6 +998,21 @@ class TelegramChannel:
         else:
             outgoing = self._orchestrator.process(
                 incoming
+            )
+
+        if not isinstance(
+            outgoing.metadata.get("elapsed_seconds"),
+            (int, float),
+        ):
+            outgoing = replace(
+                outgoing,
+                metadata={
+                    **outgoing.metadata,
+                    "elapsed_seconds": (
+                        perf_counter()
+                        - processing_started
+                    ),
+                },
             )
 
         await self.send_outgoing(
@@ -1174,56 +1192,70 @@ class TelegramChannel:
         text = outgoing.text or ""
 
         elapsed = outgoing.metadata.get(
-            "elapsed_seconds"
+            "elapsed_seconds",
+            0.0,
         )
-
         if not isinstance(
             elapsed,
             (int, float),
         ):
-            return text
-
-        minutes = elapsed / 60
+            elapsed = 0.0
 
         formatted_minutes = (
-            f"{minutes:.2f}"
+            f"{elapsed / 60:.2f}"
             .replace(".", ",")
         )
 
-        lines = [
-            text,
-            "",
-            (
-                "⏱ Tiempo de ejecución: "
-                f"{formatted_minutes} minutos"
-            ),
-        ]
-
-        model = outgoing.metadata.get(
-            "model"
-        )
-
-        if isinstance(model, str) and model:
-            lines.append(
-                f"🤖 Modelo: {model}"
-            )
+        model = outgoing.metadata.get("model")
+        if not isinstance(model, str) or not model:
+            model = "No aplica"
 
         provider = outgoing.metadata.get("provider")
-        if isinstance(provider, str) and provider != "unknown":
-            lines.append(f"🔌 Proveedor: {provider}")
+        if (
+            not isinstance(provider, str)
+            or not provider
+            or provider == "unknown"
+        ):
+            provider = "interno"
 
-        input_tokens = outgoing.metadata.get("input_tokens")
-        output_tokens = outgoing.metadata.get("output_tokens")
-        if isinstance(input_tokens, int) and isinstance(output_tokens, int):
-            lines.append(
-                f"🔢 Tokens: {input_tokens} entrada + {output_tokens} salida"
-            )
+        input_tokens = outgoing.metadata.get(
+            "input_tokens"
+        )
+        output_tokens = outgoing.metadata.get(
+            "output_tokens"
+        )
+        if not isinstance(input_tokens, int):
+            input_tokens = 0
+        if not isinstance(output_tokens, int):
+            output_tokens = 0
 
-        cost = outgoing.metadata.get("estimated_cost_usd")
-        if isinstance(cost, (int, float)):
-            lines.append(f"💵 Coste estimado: ${cost:.6f}")
+        cost = outgoing.metadata.get(
+            "estimated_cost_usd"
+        )
+        if not isinstance(cost, (int, float)):
+            cost = 0.0
 
-        return "\n".join(lines)
+        return "\n".join(
+            [
+                text,
+                "",
+                (
+                    "⏱️ Tiempo de ejecución: "
+                    f"{formatted_minutes} minutos"
+                ),
+                f"🤖 Modelo: {model}",
+                f"🔌 Proveedor: {provider}",
+                (
+                    f"🔢 Tokens: {input_tokens} "
+                    "entrada + "
+                    f"{output_tokens} salida"
+                ),
+                (
+                    "💵 Coste estimado: "
+                    f"${cost:.6f}"
+                ),
+            ]
+        )
 
     async def send_outgoing(
         self,
