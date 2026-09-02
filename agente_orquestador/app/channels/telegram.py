@@ -921,6 +921,20 @@ class TelegramChannel:
                 )
             )
 
+            is_manifest_command = (
+                content_type
+                == ContentType.COMMAND
+                and incoming.text is not None
+                and (
+                    incoming.text
+                    .strip()
+                    .lower()
+                    .startswith(
+                        "/generar_manifiesto"
+                    )
+                )
+            )
+
             progress_text: str | None = None
 
             if content_type == ContentType.TEXT:
@@ -933,6 +947,14 @@ class TelegramChannel:
                 progress_text = (
                     "Aclaración recibida. "
                     "Generando planificación..."
+                )
+
+            elif is_manifest_command:
+                progress_text = (
+                    "Generación del manifiesto "
+                    "iniciada. Puede tardar varios "
+                    "minutos; Telegram continuará "
+                    "disponible."
                 )
 
             await self._execute_incoming(
