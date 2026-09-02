@@ -36,6 +36,10 @@ def test_openai_json_format_adds_required_instruction(
 
     class FakeResponses:
         def create(self, **kwargs):
+            if "json" not in kwargs["input"].lower():
+                raise RuntimeError(
+                    "input debe mencionar json"
+                )
             request.update(kwargs)
             return SimpleNamespace(
                 output_text='{"files": []}',
@@ -65,6 +69,10 @@ def test_openai_json_format_adds_required_instruction(
         "format": {"type": "json_object"}
     }
     assert "JSON" in request["instructions"]
+    assert "JSON" in request["input"]
+    assert request["input"].startswith(
+        "Plan de archivos"
+    )
     assert request["instructions"].startswith(
         "Genera el plan solicitado."
     )
