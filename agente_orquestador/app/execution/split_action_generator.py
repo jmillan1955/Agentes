@@ -206,26 +206,34 @@ class SplitExecutionActionGenerator(
         generated_files: dict[str, str],
         max_characters: int = 6500,
     ) -> list[dict[str, str]]:
-        remaining = max_characters
-        compact_files: list[dict[str, str]] = []
-
-        for path, content in reversed(
-            tuple(generated_files.items())
-        ):
-            if remaining <= 0:
-                break
-
-            excerpt = content[:remaining]
-            compact_files.append(
-                {
-                    "relative_path": path,
-                    "content_excerpt": excerpt,
-                }
+        python_files = [
+            (path, content)
+            for path, content
+            in generated_files.items()
+            if (
+                path.lower().endswith(".py")
+                and not SplitExecutionActionGenerator
+                ._is_test_path(path)
             )
-            remaining -= len(excerpt)
+        ]
 
-        compact_files.reverse()
-        return compact_files
+        if not python_files:
+            return []
+
+        characters_per_file = max(
+            1,
+            max_characters // len(python_files),
+        )
+
+        return [
+            {
+                "relative_path": path,
+                "content_excerpt": content[
+                    :characters_per_file
+                ],
+            }
+            for path, content in python_files
+        ]
 
     def _build_file_content_prompt(
         self,
