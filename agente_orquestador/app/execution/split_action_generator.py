@@ -696,7 +696,7 @@ class SplitExecutionActionGenerator(
                 if (
                     path.endswith(".py")
                     and PurePosixPath(path).name
-                    not in {"main.py.py", "ui.py.py"}
+                    not in {"main.py", "ui.py"}
                 )
             ]
             preferred = next(
@@ -723,7 +723,7 @@ class SplitExecutionActionGenerator(
                     purpose=(
                         "Probar la logica exigida "
                         "por el plan aprobado sin "
-                        "abr ventanas"
+                        "abrir ventanas"
                     ),
                 )
             )
