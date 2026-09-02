@@ -29,6 +29,47 @@ def test_openai_reports_usage_and_cost(monkeypatch: pytest.MonkeyPatch) -> None:
     assert request["reasoning"] == {"effort": "minimal"}
 
 
+def test_openai_json_format_adds_required_instruction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = {}
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            request.update(kwargs)
+            return SimpleNamespace(
+                output_text='{"files": []}',
+                usage=SimpleNamespace(
+                    input_tokens=10,
+                    output_tokens=5,
+                ),
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr(
+        openai_module,
+        "OpenAI",
+        FakeOpenAI,
+    )
+
+    OpenAIProvider("key", "gpt-5-mini").generate(
+        "Plan de archivos",
+        system_prompt="Genera el plan solicitado.",
+        response_format="json",
+    )
+
+    assert request["text"] == {
+        "format": {"type": "json_object"}
+    }
+    assert "JSON" in request["instructions"]
+    assert request["instructions"].startswith(
+        "Genera el plan solicitado."
+    )
+
+
 def test_gemini_reports_free_usage(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeResponse:
         def raise_for_status(self): pass
