@@ -503,7 +503,15 @@ def test_does_not_persist_invalid_files(
                         "purpose": (
                             "Implementar sumar"
                         ),
-                    }
+                    },
+                    {
+                        "relative_path": (
+                            "tests/test_suma.py"
+                        ),
+                        "purpose": (
+                            "Probar sumar"
+                        ),
+                    },
                 ],
                 "pytest_target": ".",
             }
