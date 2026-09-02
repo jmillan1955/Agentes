@@ -799,7 +799,7 @@ def test_completes_incomplete_file_plan() -> None:
         "calculator_engine.py",
         "main.py",
         "ui.py",
-        "readme.md",
+        "README.md",
         "tests/test_calculator_engine.py",
     }
     assert completed.pytest_target == "."
