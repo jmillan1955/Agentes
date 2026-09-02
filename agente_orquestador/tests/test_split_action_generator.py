@@ -196,7 +196,9 @@ def create_plan():
         inputs=("Dos numeros",),
         outputs=("La suma",),
         business_rules=(),
+        phases=(),
         tests=("Probar suma",),
+        deployment=(),
         excluded_items=("No usar red",),
         completion_criteria=(
             "Todas las pruebas pasan",
@@ -652,3 +654,94 @@ def test_limits_previous_file_context() -> None:
     assert compact[-1]["relative_path"] == (
         "segundo.py"
     )
+
+
+def test_rejects_file_plan_without_tests() -> None:
+    file_plan = GeneratedFilePlan(
+        files=(
+            GeneratedFileSpec(
+                relative_path="suma.py",
+                purpose="Implementar suma",
+            ),
+        ),
+        pytest_target=".",
+    )
+
+    with pytest.raises(
+        ExecutionActionGenerationError,
+        match="archivo de tests",
+    ):
+        (
+            create_generator()
+            ._validate_file_plan_against_plan(
+                plan=create_plan(),
+                file_plan=file_plan,
+            )
+        )
+
+
+def test_rejects_python_file_as_pytest_target(
+) -> None:
+    file_plan = GeneratedFilePlan(
+        files=(
+            GeneratedFileSpec(
+                relative_path="suma.py",
+                purpose="Implementar suma",
+            ),
+            GeneratedFileSpec(
+                relative_path="tests/test_suma.py",
+                purpose="Probar suma",
+            ),
+        ),
+        pytest_target="suma.py",
+    )
+
+    with pytest.raises(
+        ExecutionActionGenerationError,
+        match="directorio",
+    ):
+        (
+            create_generator()
+            ._validate_file_plan_against_plan(
+                plan=create_plan(),
+                file_plan=file_plan,
+            )
+        )
+
+
+def test_rejects_missing_explicit_plan_files(
+) -> None:
+    plan = create_plan()
+    plan.interfaces = (
+        "Arranque en main.py",
+        "Interfaz separada en ui.py",
+    )
+    plan.phases = (
+        "Documentar el uso en README",
+    )
+
+    file_plan = GeneratedFilePlan(
+        files=(
+            GeneratedFileSpec(
+                relative_path="suma.py",
+                purpose="Implementar suma",
+            ),
+            GeneratedFileSpec(
+                relative_path="tests/test_suma.py",
+                purpose="Probar suma",
+            ),
+        ),
+        pytest_target=".",
+    )
+
+    with pytest.raises(
+        ExecutionActionGenerationError,
+        match="main.py, readme.md, ui.py",
+    ):
+        (
+            create_generator()
+            ._validate_file_plan_against_plan(
+                plan=plan,
+                file_plan=file_plan,
+            )
+        )
