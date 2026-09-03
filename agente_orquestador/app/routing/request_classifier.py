@@ -4,7 +4,9 @@ import re
 import unicodedata
 
 from app.routing.models import (
+    ProviderPreference,
     RequestKind,
+    RequestSubtype,
     RoutingDecision,
 )
 
@@ -26,6 +28,8 @@ class RequestClassifier:
         "modifica",
         "prepara",
         "publica",
+        "repara",
+        "revisa",
     }
 
     _ORCHESTRATOR_TERMS = {
@@ -46,6 +50,15 @@ class RequestClassifier:
         "nueva",
     }
 
+    _SOCIAL_MESSAGES = {
+        "buenos dias",
+        "buenas tardes",
+        "buenas noches",
+        "gracias",
+        "hola",
+        "muchas gracias",
+    }
+
     def classify(
         self,
         text: str,
@@ -60,12 +73,31 @@ class RequestClassifier:
         normalized_text = self._normalize(
             clean_text
         )
+        provider = self._detect_provider(
+            normalized_text
+        )
 
         if normalized_text.startswith("/"):
             return RoutingDecision(
                 kind=RequestKind.COMMAND,
                 summary=clean_text,
                 confidence=1.0,
+                subtype=RequestSubtype.COMMAND,
+                provider=(
+                    provider
+                    if provider
+                    != ProviderPreference.DEFAULT
+                    else ProviderPreference.INTERNAL
+                ),
+            )
+
+        if normalized_text in self._SOCIAL_MESSAGES:
+            return RoutingDecision(
+                kind=RequestKind.GENERAL_QUERY,
+                summary=clean_text,
+                confidence=0.98,
+                subtype=RequestSubtype.SOCIAL,
+                provider=provider,
             )
 
         first_word = self._first_word(
@@ -92,6 +124,26 @@ class RequestClassifier:
                 summary=clean_text,
                 confidence=0.90,
                 project_name=project_name,
+                subtype=self._detect_task_subtype(
+                    normalized_text
+                ),
+                provider=provider,
+            )
+
+        if self._is_comparison(
+            normalized_text
+        ):
+            return RoutingDecision(
+                kind=RequestKind.GENERAL_QUERY,
+                summary=clean_text,
+                confidence=0.95,
+                subtype=(
+                    RequestSubtype
+                    .PROVIDER_COMPARISON
+                ),
+                provider=(
+                    ProviderPreference.COMPARISON
+                ),
             )
 
         if project_name is not None:
@@ -100,12 +152,160 @@ class RequestClassifier:
                 summary=clean_text,
                 confidence=0.85,
                 project_name=project_name,
+                subtype=(
+                    RequestSubtype
+                    .PROJECT_INFORMATION
+                ),
+                provider=provider,
+            )
+
+        subtype = (
+            RequestSubtype.PROVIDER_RESPONSE
+            if provider
+            in {
+                ProviderPreference.OLLAMA,
+                ProviderPreference.OPENAI,
+                ProviderPreference.CODEX,
+            }
+            else RequestSubtype.GENERAL_RESPONSE
+        )
+
+        if self._needs_current_information(
+            normalized_text
+        ):
+            subtype = (
+                RequestSubtype.CURRENT_INFORMATION
+            )
+            provider = (
+                ProviderPreference.VERIFICATION
             )
 
         return RoutingDecision(
             kind=RequestKind.GENERAL_QUERY,
             summary=clean_text,
             confidence=0.70,
+            subtype=subtype,
+            provider=provider,
+        )
+
+    def _detect_task_subtype(
+        self,
+        text: str,
+    ) -> RequestSubtype:
+        if any(
+            term in text
+            for term in (
+                "error",
+                "fallo",
+                "traceback",
+                "pytest",
+                "corrige",
+                "repara",
+            )
+        ):
+            return RequestSubtype.BUG_FIX
+
+        if (
+            "home assistant" in text
+            and any(
+                term in text
+                for term in (
+                    "automatizacion",
+                    "script",
+                    "yaml",
+                )
+            )
+        ):
+            return (
+                RequestSubtype
+                .HOME_ASSISTANT_YAML
+            )
+
+        if any(
+            term in text
+            for term in (
+                "fastapi",
+                "api rest",
+                "backend",
+                "endpoint",
+            )
+        ):
+            return RequestSubtype.BACKEND_API
+
+        if (
+            "python" in text
+            and any(
+                term in text
+                for term in (
+                    "escritorio",
+                    "tkinter",
+                    "windows",
+                )
+            )
+        ):
+            return (
+                RequestSubtype
+                .DESKTOP_PYTHON_APP
+            )
+
+        if (
+            "python" in text
+            and "script" in text
+        ):
+            return RequestSubtype.PYTHON_SCRIPT
+
+        return RequestSubtype.PROJECT_TASK
+
+    @staticmethod
+    def _detect_provider(
+        text: str,
+    ) -> ProviderPreference:
+        if "codex" in text:
+            return ProviderPreference.CODEX
+        if "openai" in text:
+            return ProviderPreference.OPENAI
+        if "ollama" in text:
+            return ProviderPreference.OLLAMA
+        return ProviderPreference.DEFAULT
+
+    @staticmethod
+    def _is_comparison(text: str) -> bool:
+        provider_count = sum(
+            provider in text
+            for provider in (
+                "codex",
+                "openai",
+                "ollama",
+                "gemini",
+            )
+        )
+        return (
+            provider_count >= 2
+            and any(
+                term in text
+                for term in (
+                    "compara",
+                    "comparacion",
+                    "diferencia",
+                )
+            )
+        )
+
+    @staticmethod
+    def _needs_current_information(
+        text: str,
+    ) -> bool:
+        return any(
+            term in text
+            for term in (
+                "actualmente",
+                "ultima version",
+                "version actual",
+                "version estable",
+                "hoy",
+                "noticias",
+                "precio actual",
+            )
         )
 
     def _project_task_verb(
