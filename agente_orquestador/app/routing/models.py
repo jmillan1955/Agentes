@@ -12,6 +12,33 @@ class RequestKind(str, Enum):
     COMMAND = "command"
 
 
+class RequestSubtype(str, Enum):
+    UNKNOWN = "unknown"
+    COMMAND = "command"
+    SOCIAL = "social"
+    GENERAL_RESPONSE = "general_response"
+    PROVIDER_RESPONSE = "provider_response"
+    PROVIDER_COMPARISON = "provider_comparison"
+    CURRENT_INFORMATION = "current_information"
+    PROJECT_INFORMATION = "project_information"
+    PROJECT_TASK = "project_task"
+    PYTHON_SCRIPT = "python_script"
+    DESKTOP_PYTHON_APP = "desktop_python_app"
+    HOME_ASSISTANT_YAML = "home_assistant_yaml"
+    BACKEND_API = "backend_api"
+    BUG_FIX = "bug_fix"
+
+
+class ProviderPreference(str, Enum):
+    DEFAULT = "default"
+    INTERNAL = "internal"
+    OLLAMA = "ollama"
+    OPENAI = "openai"
+    CODEX = "codex"
+    COMPARISON = "comparison"
+    VERIFICATION = "verification"
+
+
 @dataclass(frozen=True, slots=True)
 class RoutingDecision:
     kind: RequestKind
@@ -21,6 +48,8 @@ class RoutingDecision:
     missing_information: tuple[str, ...] = field(
         default_factory=tuple
     )
+    subtype: RequestSubtype = RequestSubtype.UNKNOWN
+    provider: ProviderPreference = ProviderPreference.DEFAULT
 
     def __post_init__(self) -> None:
         clean_summary = self.summary.strip()
