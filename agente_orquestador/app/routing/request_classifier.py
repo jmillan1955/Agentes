@@ -198,7 +198,6 @@ class RequestClassifier:
                 "error",
                 "fallo",
                 "traceback",
-                "pytest",
                 "corrige",
                 "repara",
             )
