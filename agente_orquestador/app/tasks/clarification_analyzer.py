@@ -139,7 +139,6 @@ class TaskClarificationAnalyzer:
 
     _APPLICATION_TERMS = (
         "api",
-        "aplicacion",
         "automatizacion",
         "consola",
         "escritorio",
