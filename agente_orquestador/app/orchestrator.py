@@ -299,6 +299,12 @@ class Orchestrator:
                     "routing_summary": (
                         decision.summary
                     ),
+                    "routing_subtype": (
+                        decision.subtype.value
+                    ),
+                    "routing_provider": (
+                        decision.provider.value
+                    ),
                     "routing_requires_clarification": (
                         decision
                         .requires_clarification
@@ -3983,6 +3989,8 @@ class Orchestrator:
             "",
             f"Petición: {decision.summary}",
             f"Tipo: {decision.kind.value}",
+            f"Subtipo: {decision.subtype.value}",
+            f"Proveedor: {decision.provider.value}",
             (
                 "Confianza: "
                 f"{decision.confidence:.0%}"
