@@ -11,13 +11,11 @@ from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_INITIAL_PROMPT = (
-    "El usuario habla en español sobre programación, inteligencia artificial, "
-    "bases de datos, aplicaciones y proyectos de software."
-)
-
 DEFAULT_HOTWORDS = (
-    "SQLite FastAPI Flask Angular React JavaScript Python Telegram Whisper "
+    "barra agenda evento start estart estar nuevo conversaciones abrir historial "
+    "ver plan responder tarea aprobar tarea lista compra aviso texto aviso voz "
+    "aviso ambos confirmar audio corregido corregir revisar modelo calendario "
+    "mañana SQLite FastAPI Flask Angular React JavaScript Python Telegram Whisper "
     "Codex Luna Terra AgenteIA agente_orquestador agente_telegram"
 )
 
@@ -59,7 +57,7 @@ class TranscriptionService:
             language=self.language,
             beam_size=5,
             vad_filter=True,
-            initial_prompt=DEFAULT_INITIAL_PROMPT,
+            condition_on_previous_text=False,
             hotwords=DEFAULT_HOTWORDS,
         )
         text = " ".join(
