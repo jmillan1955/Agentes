@@ -23,6 +23,11 @@ También están disponibles estos comandos:
 - `/agenda`: muestra los próximos siete días.
 - `/agenda 14`: muestra los próximos catorce días.
 
+También pueden dictarse: di «barra agenda» o «barra agenda catorce». Si Whisper
+omite «barra», se acepta un comando inequívoco al principio, como «evento
+dentista mañana a las 12». Los nombres con guion bajo se pronuncian separados;
+por ejemplo, «barra aviso voz mensaje» se interpreta como `/aviso_voz mensaje`.
+
 Las consultas están limitadas a un máximo de 31 días para ofrecer respuestas
 rápidas y fáciles de leer en Telegram.
 
@@ -59,6 +64,12 @@ Cuando se escribe una fecha sin año que ya ha pasado, el agente interpreta que
 corresponde al año siguiente.
 
 ## Crear un evento mediante audio
+
+Para ejecutar un comando desde una nota de voz, empieza la transcripción por
+«barra». Por ejemplo, «barra evento dentista mañana a las 18 horas» ejecuta el
+mismo controlador que `/evento Dentista mañana a las 18:00`, conservando los
+argumentos transcritos. Si la nota no empieza por un comando reconocido, se
+mantiene el flujo de revisión siguiente:
 
 1. Envía la nota de voz a Agente Telegram.
 2. Revisa la transcripción mostrada.
