@@ -260,3 +260,18 @@ def test_classifies_social_messages(
         decision.subtype
         == RequestSubtype.SOCIAL
     )
+
+def test_pytest_requirement_does_not_turn_script_into_bug_fix(
+) -> None:
+    decision = RequestClassifier().classify(
+        "Crea un script Python que renombre "
+        "todos los archivos JPG de una carpeta, "
+        "conserve su extensión y tenga pruebas "
+        "con pytest"
+    )
+
+    assert decision.kind == RequestKind.TASK
+    assert (
+        decision.subtype
+        == RequestSubtype.PYTHON_SCRIPT
+    )
